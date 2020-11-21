@@ -53,12 +53,25 @@ void makegif(unsigned char im[70*200], unsigned char gif[gifsize], int style) {
   memcpy(gif+gifsize-4,"\x01" "\x11" "\x00" ";",4);
 }
 
-static const int8_t sw[200]={0, 4, 8, 12, 16, 20, 23, 27, 31, 35, 39, 43, 47, 50, 54, 58, 61, 65, 68, 71, 75, 78, 81, 84, 87, 90, 93, 96, 98, 101, 103, 105, 108, 110, 112, 114, 115, 117, 119, 120, 121, 122, 123, 124, 125, 126, 126, 127, 127, 127, 127, 127, 127, 127, 126, 126, 125, 124, 123, 122, 121, 120, 119, 117, 115, 114, 112, 110, 108, 105, 103, 101, 98, 96, 93, 90, 87, 84, 81, 78, 75, 71, 68, 65, 61, 58, 54, 50, 47, 43, 39, 35, 31, 27, 23, 20, 16, 12, 8, 4, 0, -4, -8, -12, -16, -20, -23, -27, -31, -35, -39, -43, -47, -50, -54, -58, -61, -65, -68, -71, -75, -78, -81, -84, -87, -90, -93, -96, -98, -101, -103, -105, -108, -110, -112, -114, -115, -117, -119, -120, -121, -122, -123, -124, -125, -126, -126, -127, -127, -127, -127, -127, -127, -127, -126, -126, -125, -124, -123, -122, -121, -120, -119, -117, -115, -114, -112, -110, -108, -105, -103, -101, -98, -96, -93, -90, -87, -84, -81, -78, -75, -71, -68, -65, -61, -58, -54, -50, -47, -43, -39, -35, -31, -27, -23, -20, -16, -12, -8, -4};
+static const int8_t sw[200]=
+    {
+     0, 4, 8, 12, 16, 20, 23, 27, 31, 35, 39, 43, 47, 50, 54, 58, 61, 65, 68, 71, 75, 78, 81, 84,
+     87, 90, 93, 96, 98, 101, 103, 105, 108, 110, 112, 114, 115, 117, 119, 120, 121, 122, 123, 124,
+     125, 126, 126, 127, 127, 127, 127, 127, 127, 127, 126, 126, 125, 124, 123, 122, 121, 120, 119,
+     117, 115, 114, 112, 110, 108, 105, 103, 101, 98, 96, 93, 90, 87, 84, 81, 78, 75, 71, 68, 65,
+     61, 58, 54, 50, 47, 43, 39, 35, 31, 27, 23, 20, 16, 12, 8, 4, 0, -4, -8, -12, -16, -20, -23,
+     -27, -31, -35, -39, -43, -47, -50, -54, -58, -61, -65, -68, -71, -75, -78, -81, -84, -87, -90,
+     -93, -96, -98, -101, -103, -105, -108, -110, -112, -114, -115, -117, -119, -120, -121, -122,
+     -123, -124, -125, -126, -126, -127, -127, -127, -127, -127, -127, -127, -126, -126, -125,
+     -124, -123, -122, -121, -120, -119, -117, -115, -114, -112, -110, -108, -105, -103, -101, -98,
+     -96, -93, -90, -87, -84, -81, -78, -75, -71, -68, -65, -61, -58, -54, -50, -47, -43, -39, -35,
+     -31, -27, -23, -20, -16, -12, -8, -4};
 
 
 #define MAX(x,y) ((x>y)?(x):(y))
 
-static int letter(int n, int pos, unsigned char im[70*200], unsigned char swr[200], uint8_t s1, uint8_t s2) {
+static int letter(int n, int pos, unsigned char im[70*200], unsigned char swr[200],
+                  uint8_t s1, uint8_t s2) {
   int8_t *p=lt[n];
   unsigned char *r=im+200*16+pos;
   unsigned char *i=r;
@@ -96,7 +109,7 @@ static void line(unsigned char im[70*200], unsigned char swr[200], uint8_t s1) {
   for(x=0;x<199;x++) {
     if(sk1>=200) sk1=sk1%200;
     int skew=sw[sk1]/20;
-    sk1+=swr[x]&0x3+1;
+    sk1+=swr[x]&(0x3+1);
     unsigned char *i= im+(200*(45+skew)+x);
     i[0]=0; i[1]=0; i[200]=0; i[201]=0;
   }
@@ -171,7 +184,6 @@ void captcha(unsigned char im[70*200], unsigned char l[8], int length, int i_lin
   for(x=length;x<8;x++){
     l[length]=0;
   }
-  //l[0]%=25; l[1]%=25; l[2]%=25; l[3]%=25; l[4]=0; // l[4]%=25; l[5]=0;
   int p=30;
   for(x=0;x<length;x++){
     p=letter(l[x],p,im,swr,s1,s2);
@@ -193,32 +205,13 @@ void captcha(unsigned char im[70*200], unsigned char l[8], int length, int i_lin
   for(x=0;x<length;x++){
     l[x]=letters[l[x]];
   }
-  //l[1]=letters[l[1]]; l[2]=letters[l[2]]; l[3]=letters[l[3]]; //l[4]=letters[l[4]];
 }
-
-/* #ifdef CAPTCHA */
-
-/* int main() { */
-/*   unsigned char l[6]; */
-/*   unsigned char im[70*200]; */
-/*   unsigned char gif[gifsize]; */
-
-/*   captcha(im,l,6,0,0,1,0); */
-/*   makegif(im,gif,1); */
-
-/*   write(1,gif,gifsize); */
-/*   write(2,l,5); */
-
-/*   return 0; */
-/* } */
-
-/* #endif */
 
 
 /* ERLANG */
 
 
-ERL_NIF_TERM
+static ERL_NIF_TERM
 mk_atom(ErlNifEnv* env, const char* atom)
 {
     ERL_NIF_TERM ret;
@@ -231,7 +224,7 @@ mk_atom(ErlNifEnv* env, const char* atom)
     return ret;
 }
 
-ERL_NIF_TERM
+static ERL_NIF_TERM
 mk_error(ErlNifEnv* env, const char* mesg)
 {
     return enif_make_tuple2(env, mk_atom(env, "error"), mk_atom(env, mesg));
@@ -240,10 +233,9 @@ mk_error(ErlNifEnv* env, const char* mesg)
 static ERL_NIF_TERM
 mk_captcha(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[], int as_gif)
 {
-    ErlNifEnv* msg_env;
     ERL_NIF_TERM opts_head, opts_tail, chars_bin, img_data_bin;
     int len, i_line = 0, i_blur = 0, i_filter = 0, i_dots = 0;
-    char opt_name[10];
+    char opt_name[8];
 
     unsigned char* chars;
 
