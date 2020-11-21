@@ -5,14 +5,25 @@
 -define(APPNAME, ecaptcha).
 -define(LIBNAME, ecaptcha).
 
+-define(NDOTS, 200).
+-define(MIN_RAND, 200 + ?NDOTS * 4 + 2).
+
 -type opts() :: [line | blur | filter | dots].
 
--spec pixels(Size :: pos_integer(), opts()) -> {Str :: binary(), Pixels :: binary()}.
-pixels(_, _) ->
+-spec pixels(NumChars :: pos_integer(), opts()) -> {Str :: binary(), Pixels :: binary()}.
+pixels(NumChars, Opts) ->
+    pixels_nif(NumChars, crypto:strong_rand_bytes(?MIN_RAND + NumChars), Opts).
+
+-spec gif(NumChars :: pos_integer(), opts()) -> {Str :: binary(), GifImg :: binary()}.
+gif(NumChars, Opts) ->
+    gif_nif(NumChars, crypto:strong_rand_bytes(?MIN_RAND + NumChars), Opts).
+
+%% Internal
+
+pixels_nif(_NumChars, _Rand, _Opts) ->
     not_loaded(?LINE).
 
--spec gif(Size :: pos_integer(), opts()) -> {Str :: binary(), GifImg :: binary()}.
-gif(_, _) ->
+gif_nif(_NumChars, _Rand, _Opts) ->
     not_loaded(?LINE).
 
 init() ->
