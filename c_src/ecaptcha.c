@@ -90,10 +90,6 @@ static int letter(int n, int pos, unsigned char im[70*200], unsigned char swr[20
   return mpos + 3;
 }
 
-#define NDOTS 200
-
-uint32_t dr[NDOTS];
-
 static void line(unsigned char im[70*200], unsigned char swr[200], uint8_t s1) {
   int x;
   int sk1=s1;
@@ -106,7 +102,9 @@ static void line(unsigned char im[70*200], unsigned char swr[200], uint8_t s1) {
   }
 }
 
-static void dots(unsigned char im[70*200]) {
+#define NDOTS 200
+
+static void dots(unsigned char im[70*200], uint32_t* dr) {
   int n;
   for(n=0;n<NDOTS;n++) {
     uint32_t v=dr[n];
@@ -159,6 +157,7 @@ void captcha(unsigned char im[70*200], unsigned char l[8], int length, int i_lin
              int i_filter, int i_dots) {
   unsigned char swr[200];
   uint8_t s1,s2;
+  uint32_t dr[NDOTS];
 
   int f=open("/dev/urandom",O_RDONLY);
   read(f,l,5); read(f,swr,200); read(f,dr,sizeof(dr)); read(f,&s1,1); read(f,&s2,1);
@@ -182,7 +181,7 @@ void captcha(unsigned char im[70*200], unsigned char l[8], int length, int i_lin
     line(im,swr,s1);
   }
   if (i_dots == 1) {
-    dots(im);
+      dots(im, dr);
   }
   if (i_blur == 1) {
     blur(im);
