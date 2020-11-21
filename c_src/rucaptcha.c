@@ -238,7 +238,7 @@ mk_error(ErlNifEnv* env, const char* mesg)
 }
 
 static ERL_NIF_TERM
-mk_captcha(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+mk_captcha(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[], int as_gif)
 {
     ErlNifEnv* msg_env;
     ERL_NIF_TERM opts_head, opts_tail, chars_bin, img_data_bin;
@@ -246,7 +246,6 @@ mk_captcha(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     char opt_name[10];
 
     unsigned char* chars;
-    unsigned char* img;
 
     if(argc != 2)
     {
@@ -280,17 +279,40 @@ mk_captcha(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             return mk_error(env, "unknown_option");
         }
     }
-    img = enif_make_new_binary(env, 70*200, &img_data_bin);
     chars = enif_make_new_binary(env, len, &chars_bin);
+    if (as_gif) {
+        unsigned char img[70*200];
+        unsigned char* gif;
+        gif = enif_make_new_binary(env, gifsize, &img_data_bin);
 
-    captcha(img, chars, len, i_line, i_blur, i_filter, i_dots);
+        captcha(img, chars, len, i_line, i_blur, i_filter, i_dots);
+        makegif(img, gif, 1);
+        return enif_make_tuple2(env, chars_bin, img_data_bin);
+    } else {
+        unsigned char* img;
+        img = enif_make_new_binary(env, 70*200, &img_data_bin);
 
-    return enif_make_tuple2(env, chars_bin, img_data_bin);
+        captcha(img, chars, len, i_line, i_blur, i_filter, i_dots);
+        return enif_make_tuple2(env, chars_bin, img_data_bin);
+    }
+
+}
+
+static ERL_NIF_TERM
+mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    return mk_captcha(env, argc, argv, 0);
+}
+
+static ERL_NIF_TERM
+mk_gif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    return mk_captcha(env, argc, argv, 1);
 }
 
 static ErlNifFunc nif_funcs[] = {
-    {"captcha", 2, mk_captcha}/* , */
-    /* {"gif", 2, mk_gif} */
+    {"pixels", 2, mk_pixels},
+    {"gif", 2, mk_gif}
 };
 
 ERL_NIF_INIT(rucaptcha, nif_funcs, NULL, NULL, NULL, NULL);

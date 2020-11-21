@@ -1,11 +1,18 @@
 -module(rucaptcha).
--export([captcha/2]).
+-export([pixels/2, gif/2]).
 -on_load(init/0).
 
 -define(APPNAME, ecaptcha).
 -define(LIBNAME, ecaptcha).
 
-captcha(_, _) ->
+-type opts() :: [line | blur | filter | dots].
+
+-spec pixels(Size :: pos_integer(), opts()) -> {Str :: binary(), Pixels :: binary()}.
+pixels(_, _) ->
+    not_loaded(?LINE).
+
+-spec gif(Size :: pos_integer(), opts()) -> {Str :: binary(), GifImg :: binary()}.
+gif(_, _) ->
     not_loaded(?LINE).
 
 init() ->
