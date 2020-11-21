@@ -1,4 +1,5 @@
 // http://github.com/ITikhonov/captcha
+// https://github.com/huacnlee/rucaptcha
 const int gifsize;
 void captcha(unsigned char im[70*200], unsigned char l[8], int length, int i_line, int i_blur,
              int i_filter, int i_dots);
@@ -315,4 +316,4 @@ static ErlNifFunc nif_funcs[] = {
     {"gif", 2, mk_gif}
 };
 
-ERL_NIF_INIT(rucaptcha, nif_funcs, NULL, NULL, NULL, NULL);
+ERL_NIF_INIT(ecaptcha, nif_funcs, NULL, NULL, NULL, NULL);

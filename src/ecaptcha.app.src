@@ -1,5 +1,5 @@
 {application, ecaptcha,
- [{description, "An OTP library"},
+ [{description, "Erlang library to generate captcha images"},
   {vsn, "0.1.0"},
   {registered, []},
   {applications,
