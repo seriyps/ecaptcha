@@ -1,6 +1,6 @@
 -module(ecaptcha).
 
--export([pixels/2, gif/3]).
+-export([pixels/2, gif/3, png/3]).
 -export([pixels_as_gif/2]).
 
 -export_type([opts/0, color/0, err_reason/0]).
@@ -35,6 +35,15 @@ pixels(NumChars, Opts) ->
     | {error, err_reason()}.
 gif(NumChars, Opts, Color) ->
     gif_nif(NumChars, crypto:strong_rand_bytes(?MIN_RAND + NumChars), Opts, color_idx(Color)).
+
+-spec png(NumChars :: pos_integer(), opts(), color()) ->
+    {Str :: binary(), GifImg :: binary()}
+    | {error, err_reason()}.
+png(NumChars, Opts, Color) ->
+    case pixels(NumChars, Opts) of
+        {error, _} = Err -> Err;
+        {Str, Pixels} -> {Str, ecaptcha_png:encode(Pixels, 200, 70, Color)}
+    end.
 
 -spec pixels_as_gif(binary(), color()) ->
     binary() | {error, bad_image | wrong_pixels_size | invalid_color}.

@@ -94,6 +94,26 @@ prop_nif_vs_erl_gif() ->
         end
     ).
 
+%% PNG
+
+prop_png_no_crashes(doc) ->
+    "Checks that ecaptcha_png:encode/2 never crashes".
+
+prop_png_no_crashes() ->
+    ?FORALL(
+        {NumChars, Opts, Color},
+        {proper_types:range(1, 7), filter_gen(), color_gen()},
+        begin
+            {_Text, Pixels} = ecaptcha:pixels(NumChars, Opts),
+            Png = ecaptcha_png:encode(Pixels, 200, 70, Color),
+            PngBin = iolist_to_binary(Png),
+            ?assertMatch(<<137, "PNG\r\n", _/binary>>, PngBin),
+            true
+        end
+    ).
+
+%% Generator helpers
+
 filter_gen() ->
     proper_types:list(proper_types:oneof([line, blur, filter, dots])).
 
