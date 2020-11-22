@@ -1,6 +1,9 @@
 -module(ecaptcha).
 
 -export([pixels/2, gif/3]).
+-export([pixels_as_gif/2]).
+
+-export_type([opts/0, color/0, err_reason/0]).
 
 -on_load(init/0).
 
@@ -33,6 +36,11 @@ pixels(NumChars, Opts) ->
 gif(NumChars, Opts, Color) ->
     gif_nif(NumChars, crypto:strong_rand_bytes(?MIN_RAND + NumChars), Opts, color_idx(Color)).
 
+-spec pixels_as_gif(binary(), color()) ->
+    binary() | {error, bad_image | wrong_pixels_size | invalid_color}.
+pixels_as_gif(PixelData, Color) ->
+    pixels_as_gif_nif(PixelData, color_idx(Color)).
+
 %% Internal
 
 color_idx(black) -> 0;
@@ -45,7 +53,10 @@ color_idx(purple) -> 5.
 pixels_nif(_NumChars, _Rand, _Opts) ->
     not_loaded(?LINE).
 
-gif_nif(_NumChars, _Rand, _Opts, _Color) ->
+gif_nif(_NumChars, _Rand, _Opts, _ColorIdx) ->
+    not_loaded(?LINE).
+
+pixels_as_gif_nif(_PixelData, _ColorIdx) ->
     not_loaded(?LINE).
 
 init() ->

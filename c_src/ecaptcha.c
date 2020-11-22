@@ -315,9 +315,38 @@ mk_gif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     return mk_captcha(env, argc, argv, 1);
 }
 
+static ERL_NIF_TERM
+pixels_as_gif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    ERL_NIF_TERM gif_data_bin;
+    ErlNifBinary im_bin;
+    unsigned char* gif;
+    int color;
+    if( argc != 2 )
+    {
+        return enif_make_badarg(env);
+    }
+    if(!enif_inspect_binary(env, argv[0], &im_bin)) {
+        return mk_error(env, "bad_image");
+    }
+    if(im_bin.size != (200 * 70)) {
+        return mk_error(env, "wrong_pixels_size");
+    }
+    if(!enif_get_int(env, argv[1], &color)) {
+        return mk_error(env, "invalid_color");
+    }
+    if((color < 0) || (color > sizeof(colors))) {
+        return mk_error(env, "invalid_color");
+    }
+    gif = enif_make_new_binary(env, gifsize, &gif_data_bin);
+    makegif(im_bin.data, gif, color);
+    return gif_data_bin;
+}
+
 static ErlNifFunc nif_funcs[] = {
     {"pixels_nif", 3, mk_pixels},
-    {"gif_nif", 4, mk_gif}
+    {"gif_nif", 4, mk_gif},
+    {"pixels_as_gif_nif", 2, pixels_as_gif}
 };
 
 ERL_NIF_INIT(ecaptcha, nif_funcs, NULL, NULL, NULL, NULL);

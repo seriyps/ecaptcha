@@ -77,6 +77,23 @@ prop_gif_valid() ->
         end
     ).
 
+prop_nif_vs_erl_gif(doc) ->
+    "Compares NIF GIF encoder with ecaptcha_gif".
+
+prop_nif_vs_erl_gif() ->
+    ?FORALL(
+        {NumChars, Opts, Color},
+        {proper_types:range(1, 7), filter_gen(), color_gen()},
+        begin
+            {_Text, Pixels} = ecaptcha:pixels(NumChars, Opts),
+            ?assertEqual(
+                ecaptcha:pixels_as_gif(Pixels, Color),
+                iolist_to_binary(ecaptcha_gif:encode(Pixels, 200, 70, Color))
+            ),
+            true
+        end
+    ).
+
 filter_gen() ->
     proper_types:list(proper_types:oneof([line, blur, filter, dots])).
 
