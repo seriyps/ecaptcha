@@ -344,9 +344,9 @@ pixels_as_gif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 }
 
 static ErlNifFunc nif_funcs[] = {
-    {"pixels_nif", 3, mk_pixels},
-    {"gif_nif", 4, mk_gif},
-    {"pixels_as_gif_nif", 2, pixels_as_gif}
+    {"pixels", 3, mk_pixels},
+    {"gif", 4, mk_gif},
+    {"pixels_as_gif", 2, pixels_as_gif}
 };
 
-ERL_NIF_INIT(ecaptcha, nif_funcs, NULL, NULL, NULL, NULL);
+ERL_NIF_INIT(ecaptcha_nif, nif_funcs, NULL, NULL, NULL, NULL);
