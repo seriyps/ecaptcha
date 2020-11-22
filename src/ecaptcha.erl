@@ -11,12 +11,24 @@
 -define(MIN_RAND, 200 + ?NDOTS * 4 + 2).
 
 -type opts() :: [line | blur | filter | dots].
+-type err_reason() ::
+    length_not_integer
+    | invalid_num_chars
+    | bad_random
+    | small_rand_binary
+    | opts_not_list
+    | non_atom_opt
+    | unknown_option.
 
--spec pixels(NumChars :: pos_integer(), opts()) -> {Str :: binary(), Pixels :: binary()}.
+-spec pixels(NumChars :: pos_integer(), opts()) ->
+    {Str :: binary(), Pixels :: binary()}
+    | {error, err_reason()}.
 pixels(NumChars, Opts) ->
     pixels_nif(NumChars, crypto:strong_rand_bytes(?MIN_RAND + NumChars), Opts).
 
--spec gif(NumChars :: pos_integer(), opts()) -> {Str :: binary(), GifImg :: binary()}.
+-spec gif(NumChars :: pos_integer(), opts()) ->
+    {Str :: binary(), GifImg :: binary()}
+    | {error, err_reason()}.
 gif(NumChars, Opts) ->
     gif_nif(NumChars, crypto:strong_rand_bytes(?MIN_RAND + NumChars), Opts).
 
