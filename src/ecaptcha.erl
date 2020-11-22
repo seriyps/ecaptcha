@@ -1,6 +1,6 @@
 -module(ecaptcha).
 
--export([pixels/2, gif/2]).
+-export([pixels/2, gif/3]).
 
 -on_load(init/0).
 
@@ -11,6 +11,7 @@
 -define(MIN_RAND, 200 + ?NDOTS * 4 + 2).
 
 -type opts() :: [line | blur | filter | dots].
+-type color() :: black | red | orange | blue | pink | blue.
 -type err_reason() ::
     length_not_integer
     | invalid_num_chars
@@ -26,18 +27,25 @@
 pixels(NumChars, Opts) ->
     pixels_nif(NumChars, crypto:strong_rand_bytes(?MIN_RAND + NumChars), Opts).
 
--spec gif(NumChars :: pos_integer(), opts()) ->
+-spec gif(NumChars :: pos_integer(), opts(), color()) ->
     {Str :: binary(), GifImg :: binary()}
     | {error, err_reason()}.
-gif(NumChars, Opts) ->
-    gif_nif(NumChars, crypto:strong_rand_bytes(?MIN_RAND + NumChars), Opts).
+gif(NumChars, Opts, Color) ->
+    gif_nif(NumChars, crypto:strong_rand_bytes(?MIN_RAND + NumChars), Opts, color_idx(Color)).
 
 %% Internal
+
+color_idx(black) -> 0;
+color_idx(red) -> 1;
+color_idx(orange) -> 2;
+color_idx(blue) -> 3;
+color_idx(pink) -> 4;
+color_idx(purple) -> 5.
 
 pixels_nif(_NumChars, _Rand, _Opts) ->
     not_loaded(?LINE).
 
-gif_nif(_NumChars, _Rand, _Opts) ->
+gif_nif(_NumChars, _Rand, _Opts, _Color) ->
     not_loaded(?LINE).
 
 init() ->

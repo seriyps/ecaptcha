@@ -5,12 +5,8 @@ void captcha(const unsigned char* rand, unsigned char im[70*200], unsigned char 
              int length, int i_line, int i_blur, int i_filter, int i_dots);
 void makegif(unsigned char im[70*200], unsigned char gif[gifsize], int style);
 
-#include <unistd.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <fcntl.h>
 #include <string.h>
-#include <time.h>
 #include "erl_nif.h"
 #include "font.h"
 #include "colors.h"
@@ -18,16 +14,10 @@ void makegif(unsigned char im[70*200], unsigned char gif[gifsize], int style);
 static int8_t *lt[];
 const int gifsize=17646;
 
-void makegif(unsigned char im[70*200], unsigned char gif[gifsize], int style) {
+void makegif(unsigned char im[70*200], unsigned char gif[gifsize], int color_idx) {
   // tag ; widthxheight ; GCT:0:0:7 ; bgcolor + aspect // GCT
   // Image Separator // left x top // widthxheight // Flags
   // LZW code size
-  srand(time(NULL));
-  int color_len = (int) sizeof(colors) / sizeof(colors[0]);
-  int color_idx = rand() % color_len;
-  if (style == 0) {
-    color_idx = 0;
-  }
   memcpy(gif,colors[color_idx],13+48+10+1);
 
   int x,y;
@@ -239,12 +229,12 @@ mk_captcha(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[], int as_gif)
 {
     ERL_NIF_TERM opts_head, opts_tail, chars_bin, img_data_bin;
     ErlNifBinary rand_bin;
-    int len, i_line = 0, i_blur = 0, i_filter = 0, i_dots = 0;
+    int len, color, i_line = 0, i_blur = 0, i_filter = 0, i_dots = 0;
     char opt_name[8];
 
     unsigned char* chars;
 
-    if(argc != 3)
+    if( (as_gif && argc != 4) || (!as_gif && argc != 3) )
     {
         return enif_make_badarg(env);
     }
@@ -286,6 +276,14 @@ mk_captcha(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[], int as_gif)
             return mk_error(env, "unknown_option");
         }
     }
+    if (as_gif) {
+        if(!enif_get_int(env, argv[3], &color)) {
+            return mk_error(env, "invalid_color");
+        }
+        if((color < 0) || (color > sizeof(colors))) {
+            return mk_error(env, "invalid_color");
+        }
+    }
     chars = enif_make_new_binary(env, len, &chars_bin);
     if (as_gif) {
         unsigned char img[70*200];
@@ -293,7 +291,7 @@ mk_captcha(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[], int as_gif)
         gif = enif_make_new_binary(env, gifsize, &img_data_bin);
 
         captcha(rand_bin.data, img, chars, len, i_line, i_blur, i_filter, i_dots);
-        makegif(img, gif, 1);
+        makegif(img, gif, color);
         return enif_make_tuple2(env, chars_bin, img_data_bin);
     } else {
         unsigned char* img;
@@ -319,7 +317,7 @@ mk_gif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
 static ErlNifFunc nif_funcs[] = {
     {"pixels_nif", 3, mk_pixels},
-    {"gif_nif", 3, mk_gif}
+    {"gif_nif", 4, mk_gif}
 };
 
 ERL_NIF_INIT(ecaptcha, nif_funcs, NULL, NULL, NULL, NULL);
