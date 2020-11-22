@@ -1,9 +1,12 @@
-%% https://www.w3.org/Graphics/GIF/spec-gif89a.txt
+%% @doc Basic GIF encoder
+%%
+%% [https://www.w3.org/Graphics/GIF/spec-gif89a.txt]
+%% Originally based on [https://github.com/huacnlee/rucaptcha/tree/master/ext/rucaptcha]
 -module(ecaptcha_gif).
 
 -export([encode/4]).
 
--spec encode(binary(), pos_integer(), pos_integer(), ecaptcha:color()) -> iodata().
+-spec encode(binary(), pos_integer(), pos_integer(), ecaptcha:color_name()) -> iodata().
 encode(Pixels, 200 = Width, 70 = Height, Color) when byte_size(Pixels) =:= (Width * Height) ->
     [
         header(Width, Height, Color),
@@ -14,8 +17,7 @@ encode(Pixels, 200 = Width, 70 = Height, Color) when byte_size(Pixels) =:= (Widt
 %% Header
 
 header(Width, Height, Color) ->
-    Palette = binary:copy(palette(Color), 15),
-    [header0(Width, Height), Palette, header1(Width, Height)].
+    [header0(Width, Height), palette(Color), header1(Width, Height)].
 
 %% erlfmt-ignore
 header0(Width, Height) ->
@@ -31,23 +33,16 @@ header0(Width, Height) ->
       0                                         % Aspect ratio
     >>.
 
-palette(black) ->
-    <<16#0, 16#0, 16#0>>;
-palette(red) ->
-    <<16#D5, 16#0, 16#0>>;
-palette(orange) ->
-    <<16#DD, 16#2C, 16#0>>;
-palette(blue) ->
-    <<16#29, 16#62, 16#FF>>;
-palette(pink) ->
-    <<16#C5, 16#11, 16#62>>;
-palette(purple) ->
-    <<16#62, 16#00, 16#EA>>.
+palette(Color) ->
+    Bytes = ecaptcha_color:bin_3b(ecaptcha_color:by_name(Color)),
+    [
+        binary:copy(Bytes, 15),
+        ecaptcha_color:bin_3b(ecaptcha_color:by_name(white))
+    ].
 
 %% erlfmt-ignore
 header1(Width, Height) ->
     <<
-      16#ff, 16#ff, 16#ff,                      % Palette - white
       ",",
       0:16/little, 0:16/little,                 % (x0, y0) - start of image
       Width:16/little, Height:16/little,        % (xN, yN) - end of image

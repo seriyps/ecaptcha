@@ -3,7 +3,7 @@
 -export([pixels/2, gif/3, png/3]).
 -export([pixels_as_gif/2]).
 
--export_type([opts/0, color/0, err_reason/0]).
+-export_type([opts/0, color_name/0, err_reason/0]).
 
 -on_load(init/0).
 
@@ -14,7 +14,7 @@
 -define(MIN_RAND, 200 + ?NDOTS * 4 + 2).
 
 -type opts() :: [line | blur | filter | dots].
--type color() :: black | red | orange | blue | pink | blue.
+-type color_name() :: ecaptcha_color:color_name().
 -type err_reason() ::
     length_not_integer
     | invalid_num_chars
@@ -30,13 +30,13 @@
 pixels(NumChars, Opts) ->
     pixels_nif(NumChars, crypto:strong_rand_bytes(?MIN_RAND + NumChars), Opts).
 
--spec gif(NumChars :: pos_integer(), opts(), color()) ->
+-spec gif(NumChars :: pos_integer(), opts(), color_name()) ->
     {Str :: binary(), GifImg :: binary()}
     | {error, err_reason()}.
 gif(NumChars, Opts, Color) ->
     gif_nif(NumChars, crypto:strong_rand_bytes(?MIN_RAND + NumChars), Opts, color_idx(Color)).
 
--spec png(NumChars :: pos_integer(), opts(), color()) ->
+-spec png(NumChars :: pos_integer(), opts(), color_name()) ->
     {Str :: binary(), GifImg :: binary()}
     | {error, err_reason()}.
 png(NumChars, Opts, Color) ->
@@ -45,7 +45,7 @@ png(NumChars, Opts, Color) ->
         {Str, Pixels} -> {Str, ecaptcha_png:encode(Pixels, 200, 70, Color)}
     end.
 
--spec pixels_as_gif(binary(), color()) ->
+-spec pixels_as_gif(binary(), color_name()) ->
     binary() | {error, bad_image | wrong_pixels_size | invalid_color}.
 pixels_as_gif(PixelData, Color) ->
     pixels_as_gif_nif(PixelData, color_idx(Color)).

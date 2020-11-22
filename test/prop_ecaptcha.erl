@@ -119,3 +119,8 @@ filter_gen() ->
 
 color_gen() ->
     proper_types:oneof([black, red, orange, blue, pink, purple]).
+
+%% dump(Fmt, Text, Opts, Color, Data) ->
+%%     OptsStr = lists:join(",", lists:map(fun erlang:atom_to_binary/1, lists:usort(Opts))),
+%%     Name = lists:flatten(io_lib:format(Fmt, [Text, OptsStr, Color])),
+%%     ok = file:write_file(Name, Data).
