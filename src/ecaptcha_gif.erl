@@ -1,23 +1,35 @@
+%% https://www.w3.org/Graphics/GIF/spec-gif89a.txt
 -module(ecaptcha_gif).
 
 -export([encode/4]).
 
 -spec encode(binary(), pos_integer(), pos_integer(), ecaptcha:color()) -> iodata().
-encode(Pixels, 200 = X, 70 = Y, Color) when byte_size(Pixels) =:= (X * Y) ->
+encode(Pixels, 200 = Width, 70 = Height, Color) when byte_size(Pixels) =:= (Width * Height) ->
     [
-        header(Color),
-        encode_rows(Pixels, X, Y, <<>>),
+        header(Width, Height, Color),
+        encode_rows(Pixels, Width, Height, <<>>),
         trailer()
     ].
 
 %% Header
 
-header(Color) ->
+header(Width, Height, Color) ->
     Palette = binary:copy(palette(Color), 15),
-    [header0(), Palette, header1()].
+    [header0(Width, Height), Palette, header1(Width, Height)].
 
-header0() ->
-    <<"GIF89a", 16#c8, 0, 16#46, 0, 16#83, 0, 0>>.
+%% erlfmt-ignore
+header0(Width, Height) ->
+    <<
+      "GIF89a",
+      Width:16/little,                          % Logical screen width
+      Height:16/little,                         % Logical screen height
+      1:1,                                      % GCTFlag:1 - 1 - Global Color Table exists
+      0:3,                                      % ColorResolution:3
+      0:1,                                      % SortFlag:1 - 0 - not sorted
+      3:3,                                      % GCTSize:3 - `2^(3+1)' - size of GCT
+      0,                                        % BackgroundColor index in palette
+      0                                         % Aspect ratio
+    >>.
 
 palette(black) ->
     <<16#0, 16#0, 16#0>>;
@@ -32,8 +44,16 @@ palette(pink) ->
 palette(purple) ->
     <<16#62, 16#00, 16#EA>>.
 
-header1() ->
-    <<16#ff, 16#ff, 16#ff, ",", 0, 0, 0, 0, 16#c8, 0, 16#46, 0, 0, 16#4>>.
+%% erlfmt-ignore
+header1(Width, Height) ->
+    <<
+      16#ff, 16#ff, 16#ff,                      % Palette - white
+      ",",
+      0:16/little, 0:16/little,                 % (x0, y0) - start of image
+      Width:16/little, Height:16/little,        % (xN, yN) - end of image
+      0,                                        % no local color table
+      16#4                                      % LZW minimum code size
+    >>.
 
 %% Body
 
