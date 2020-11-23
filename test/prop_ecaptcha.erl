@@ -98,6 +98,7 @@ prop_gif_valid() ->
         begin
             {Text, Gif} = ecaptcha:gif(Size, Opts, Color),
             GifBin = iolist_to_binary(Gif),
+            %% dump("tst_~s_~s_~s.gif", Text, Opts, Color, Gif),
             ?assertEqual(Size, byte_size(Text)),
             ?assertEqual(17646, byte_size(GifBin)),
             ?assertMatch(<<"GIF89a", _/binary>>, GifBin),
@@ -117,6 +118,7 @@ prop_png_valid() ->
         begin
             {_Text, Png} = ecaptcha:png(NumChars, Opts, Color),
             PngBin = iolist_to_binary(Png),
+            %% dump("tst_~s_~s_~s.png", _Text, Opts, Color, Png),
             ?assertMatch(<<137, "PNG\r\n", _/binary>>, PngBin),
             true
         end

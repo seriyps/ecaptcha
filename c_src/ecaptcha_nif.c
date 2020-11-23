@@ -196,7 +196,7 @@ mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return mk_error(env, "wrong_chars_length");
     }
     for(int i = 0; i < chars_bin.size; i++) {
-        if (chars_bin.data[i] > 'y' || chars_bin.data[i] < 'a') { // TODO: up to 'z'
+        if (chars_bin.data[i] > 'z' || chars_bin.data[i] < 'a') {
             return mk_error(env, "invalid_character");
         }
     }

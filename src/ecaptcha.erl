@@ -58,5 +58,5 @@ chars(Rand) ->
     <<<<(binary:at(Alphabet, C rem AlphabetSize))>> || <<C>> <= Rand>>.
 
 alphabet() ->
-    %TODO: 'z'
-    <<"abcdfhijklmnopqrstuvwxy">>.
+    %% XXX: no 'e' and 'g', they are confusing
+    <<"abcdfhijklmnopqrstuvwxyz">>.
