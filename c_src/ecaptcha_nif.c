@@ -24,7 +24,7 @@ static const int8_t sw[200]=
 
 #define MAX(x,y) ((x>y)?(x):(y))
 
-static int letter(int n, int pos, unsigned char im[70*200], unsigned char swr[200],
+static int letter(unsigned char n, int pos, unsigned char im[70*200], unsigned char swr[200],
                   uint8_t s1, uint8_t s2) {
   int8_t *p=lt[n];
   unsigned char *r=im+200*16+pos;
@@ -118,16 +118,13 @@ static void filter(unsigned char im[70*200]) {
   memmove(im,om,sizeof(om));
 }
 
-static const char *letters="abcdafahijklmnopqrstuvwxyz";
-
-static void captcha(const unsigned char* rand, unsigned char im[70*200], unsigned char l[8],
+static void captcha(const unsigned char* rand, unsigned char im[70*200], const unsigned char* l,
                     int length, int i_line, int i_blur, int i_filter, int i_dots) {
   unsigned char swr[200];
   uint8_t s1,s2;
   uint32_t dr[NDOTS];
 
-  memcpy(l, rand, length);
-  memcpy(swr, rand+=length, 200);
+  memcpy(swr, rand, 200);
   memcpy(dr, rand+=200, sizeof(dr));
   memcpy(&s1, rand+=sizeof(dr), 1);
   memcpy(&s2, rand+=1, 1);
@@ -136,15 +133,9 @@ static void captcha(const unsigned char* rand, unsigned char im[70*200], unsigne
   s2=s2&0x3f;
 
   int x;
-  for(x=0;x<length;x++){
-    l[x]%=25;
-  }
-  for(x=length;x<8;x++){
-    l[length]=0;
-  }
   int p=30;
   for(x=0;x<length;x++){
-    p=letter(l[x],p,im,swr,s1,s2);
+    p=letter(l[x]-'a',p,im,swr,s1,s2);
   }
 
   if (i_line == 1) {
@@ -158,10 +149,6 @@ static void captcha(const unsigned char* rand, unsigned char im[70*200], unsigne
   }
   if (i_filter == 1) {
     filter(im);
-  }
-
-  for(x=0;x<length;x++){
-    l[x]=letters[l[x]];
   }
 }
 
@@ -191,36 +178,37 @@ mk_error(ErlNifEnv* env, const char* mesg)
 static ERL_NIF_TERM
 mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-    ERL_NIF_TERM opts_head, opts_tail, chars_bin, img_data_bin;
-    ErlNifBinary rand_bin;
-    int len, i_line = 0, i_blur = 0, i_filter = 0, i_dots = 0;
+    ERL_NIF_TERM opts_head, opts_tail, img_data_bin;
+    ErlNifBinary chars_bin, rand_bin;
+    int i_line = 0, i_blur = 0, i_filter = 0, i_dots = 0;
     char opt_name[8];
 
-    unsigned char* chars;
     unsigned char* img;
 
-    if( argc != 3 )
-    {
+    if( argc != 3 ) {
         return enif_make_badarg(env);
     }
 
-    if(!enif_get_int(env, argv[0], &len))
-    {
-        return mk_error(env, "length_not_integer");
+    if(!enif_inspect_binary(env, argv[0], &chars_bin)) {
+        return mk_error(env, "chars_not_binary");
     }
-    if(len < 1 || len > 7) {
-        return mk_error(env, "invalid_num_chars");
+    if(chars_bin.size < 1 || chars_bin.size > 7) {
+        return mk_error(env, "wrong_chars_length");
+    }
+    for(int i = 0; i < chars_bin.size; i++) {
+        if (chars_bin.data[i] > 'y' || chars_bin.data[i] < 'a') { // TODO: up to 'z'
+            return mk_error(env, "invalid_character");
+        }
     }
 
     if(!enif_inspect_binary(env, argv[1], &rand_bin)) {
         return mk_error(env, "bad_random");
     }
-    if(rand_bin.size < (len + 200 + NDOTS * sizeof(uint32_t) + 2)) {
+    if(rand_bin.size < (200 + NDOTS * sizeof(uint32_t) + 2)) {
         return mk_error(env, "small_rand_binary");
     }
 
-    if(!enif_is_list(env, argv[2]))
-    {
+    if(!enif_is_list(env, argv[2])) {
         return mk_error(env, "opts_not_list");
     }
 
@@ -241,11 +229,10 @@ mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             return mk_error(env, "unknown_option");
         }
     }
-    chars = enif_make_new_binary(env, len, &chars_bin);
     img = enif_make_new_binary(env, 70*200, &img_data_bin);
 
-    captcha(rand_bin.data, img, chars, len, i_line, i_blur, i_filter, i_dots);
-    return enif_make_tuple2(env, chars_bin, img_data_bin);
+    captcha(rand_bin.data, img, chars_bin.data, chars_bin.size, i_line, i_blur, i_filter, i_dots);
+    return img_data_bin;
 }
 
 static ErlNifFunc nif_funcs[] = {

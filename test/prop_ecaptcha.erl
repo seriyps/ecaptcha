@@ -4,8 +4,9 @@
 -include_lib("stdlib/include/assert.hrl").
 
 -define(ERR_REASONS, [
-    length_not_integer,
-    invalid_num_chars,
+    chars_not_binary,
+    wrong_chars_length,
+    invalid_character,
     bad_random,
     small_rand_binary,
     opts_not_list,
@@ -20,34 +21,23 @@ prop_nif_no_crashes(doc) ->
 
 prop_nif_no_crashes() ->
     ?FORALL(
-       {NumChars, Rand, Opts},
-       nif_input_gen(),
-       case ecaptcha_nif:pixels(NumChars, Rand, Opts) of
+        {Chars, Rand, Opts},
+        nif_input_gen(),
+        case ecaptcha_nif:pixels(Chars, Rand, Opts) of
             {error, Err} ->
                 lists:member(Err, ?ERR_REASONS);
-            {Text, Bytes} when is_binary(Text), is_binary(Bytes) ->
+            Bytes when is_binary(Bytes) ->
                 true
-        end).
+        end
+    ).
 
 nif_input_gen() ->
-    Valid = ?LET(NumChars, proper_types:range(1, 7),
-                 {NumChars,
-                  ecaptcha_nif:rand_size(NumChars),
-                  opts_gen()}),
-    BadRand = {proper_types:range(1, 7),
-               proper_types:binary(),
-               opts_gen()},
-    BadOpts = ?LET(NumChars, proper_types:range(1, 7),
-                   {NumChars,
-                    ecaptcha_nif:rand_size(NumChars),
-                    proper_types:any()}),
-    BadNum = {proper_types:any(),
-              proper_types:binary(),
-              opts_gen()},
-    Mess = {proper_types:any(),
-            proper_types:any(),
-            proper_types:any()},
-    proper_types:oneof([Valid, BadRand, BadOpts, BadNum, Mess]).
+    Valid = {alpha_gen(1, 7), proper_types:binary(ecaptcha_nif:rand_size()), opts_gen()},
+    BadRand = {alpha_gen(1, 7), proper_types:binary(), opts_gen()},
+    BadOpts = {alpha_gen(1, 7), proper_types:binary(ecaptcha_nif:rand_size()), proper_types:any()},
+    BadChars = {proper_types:any(), proper_types:binary(), opts_gen()},
+    Mess = {proper_types:any(), proper_types:any(), proper_types:any()},
+    proper_types:oneof([Valid, BadRand, BadOpts, BadChars, Mess]).
 
 %% Pixels
 
@@ -139,6 +129,20 @@ opts_gen() ->
 
 color_gen() ->
     proper_types:oneof([black, red, orange, blue, pink, purple]).
+
+alpha_gen(Min, Max) ->
+    ?LET(
+        CharList,
+        ?SUCHTHAT(
+            List,
+            proper_types:list(proper_types:oneof(lists:seq($a, $z))),
+            begin
+                LL = length(List),
+                Min =< LL andalso LL =< Max
+            end
+        ),
+        list_to_binary(CharList)
+    ).
 
 %% dump(Fmt, Text, Opts, Color, Data) ->
 %%     OptsStr = lists:join(",", lists:map(fun erlang:atom_to_binary/1, lists:usort(Opts))),

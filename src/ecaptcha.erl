@@ -7,12 +7,12 @@
 -define(APPNAME, ecaptcha).
 -define(LIBNAME, ecaptcha).
 
-
 -type opts() :: [line | blur | filter | dots].
 -type color_name() :: ecaptcha_color:color_name().
 -type err_reason() ::
-    length_not_integer
-    | invalid_num_chars
+    chars_not_binary
+    | wrong_chars_length
+    | invalid_character
     | bad_random
     | small_rand_binary
     | opts_not_list
@@ -23,8 +23,14 @@
     {Str :: binary(), Pixels :: binary()}
     | {error, err_reason()}.
 pixels(NumChars, Opts) ->
-    Rand = crypto:strong_rand_bytes(ecaptcha_nif:rand_size(NumChars)),
-    ecaptcha_nif:pixels(NumChars, Rand, Opts).
+    <<CharsRand:NumChars/binary, InnerRand/binary>> = crypto:strong_rand_bytes(
+        ecaptcha_nif:rand_size() + NumChars
+    ),
+    Chars = chars(CharsRand),
+    case ecaptcha_nif:pixels(Chars, InnerRand, Opts) of
+        {error, _} = Err -> Err;
+        Pixels -> {Chars, Pixels}
+    end.
 
 -spec gif(NumChars :: pos_integer(), opts(), color_name()) ->
     {Str :: binary(), GifImg :: binary()}
@@ -38,8 +44,19 @@ gif(NumChars, Opts, Color) ->
 png(NumChars, Opts, Color) ->
     img(NumChars, Opts, Color, fun ecaptcha_png:encode/4).
 
+%% Internal
+
 img(NumChars, Opts, Color, Encoder) ->
     case pixels(NumChars, Opts) of
         {error, _} = Err -> Err;
         {Str, Pixels} -> {Str, Encoder(Pixels, 200, 70, Color)}
     end.
+
+chars(Rand) ->
+    Alphabet = alphabet(),
+    AlphabetSize = byte_size(Alphabet),
+    <<<<(binary:at(Alphabet, C rem AlphabetSize))>> || <<C>> <= Rand>>.
+
+alphabet() ->
+    %TODO: 'z'
+    <<"abcdfhijklmnopqrstuvwxy">>.

@@ -2,7 +2,7 @@
 -module(ecaptcha_nif).
 
 -export([pixels/3]).
--export([rand_size/1]).
+-export([rand_size/0]).
 
 -on_load(init/0).
 
@@ -12,11 +12,11 @@
 -define(NDOTS, 200).
 -define(MIN_RAND, 200 + ?NDOTS * 4 + 2).
 
-pixels(_NumChars, _Rand, _Opts) ->
+pixels(_Chars, _Rand, _Opts) ->
     not_loaded(?LINE).
 
-rand_size(NumChars) ->
-    ?MIN_RAND + NumChars.
+rand_size() ->
+    ?MIN_RAND.
 
 init() ->
     SoName =
