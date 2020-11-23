@@ -1,21 +1,22 @@
 %% @private
 -module(ecaptcha_nif).
 
--export([pixels/3, gif/4, pixels_as_gif/2]).
+-export([pixels/3]).
+-export([rand_size/1]).
 
 -on_load(init/0).
 
 -define(APPNAME, ecaptcha).
 -define(LIBNAME, ecaptcha).
 
+-define(NDOTS, 200).
+-define(MIN_RAND, 200 + ?NDOTS * 4 + 2).
+
 pixels(_NumChars, _Rand, _Opts) ->
     not_loaded(?LINE).
 
-gif(_NumChars, _Rand, _Opts, _ColorIdx) ->
-    not_loaded(?LINE).
-
-pixels_as_gif(_PixelData, _ColorIdx) ->
-    not_loaded(?LINE).
+rand_size(NumChars) ->
+    ?MIN_RAND + NumChars.
 
 init() ->
     SoName =

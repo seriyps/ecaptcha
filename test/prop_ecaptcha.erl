@@ -3,16 +3,53 @@
 -include_lib("proper/include/proper.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
-%% Pixels
 -define(ERR_REASONS, [
     length_not_integer,
     invalid_num_chars,
     bad_random,
     small_rand_binary,
     opts_not_list,
-    non_atom_opt,
+    non_atom_option,
     unknown_option
 ]).
+
+%% Nif
+
+prop_nif_no_crashes(doc) ->
+    "Checks that NIF does not crash whatever input is".
+
+prop_nif_no_crashes() ->
+    ?FORALL(
+       {NumChars, Rand, Opts},
+       nif_input_gen(),
+       case ecaptcha_nif:pixels(NumChars, Rand, Opts) of
+            {error, Err} ->
+                lists:member(Err, ?ERR_REASONS);
+            {Text, Bytes} when is_binary(Text), is_binary(Bytes) ->
+                true
+        end).
+
+nif_input_gen() ->
+    Valid = ?LET(NumChars, proper_types:range(1, 7),
+                 {NumChars,
+                  ecaptcha_nif:rand_size(NumChars),
+                  opts_gen()}),
+    BadRand = {proper_types:range(1, 7),
+               proper_types:binary(),
+               opts_gen()},
+    BadOpts = ?LET(NumChars, proper_types:range(1, 7),
+                   {NumChars,
+                    ecaptcha_nif:rand_size(NumChars),
+                    proper_types:any()}),
+    BadNum = {proper_types:any(),
+              proper_types:binary(),
+              opts_gen()},
+    Mess = {proper_types:any(),
+            proper_types:any(),
+            proper_types:any()},
+    proper_types:oneof([Valid, BadRand, BadOpts, BadNum, Mess]).
+
+%% Pixels
 
 prop_pixels_no_crashes(doc) ->
     "Checks that ecaptcha:pixels/2 never crashes".
@@ -35,7 +72,7 @@ prop_pixels_valid(doc) ->
 prop_pixels_valid() ->
     ?FORALL(
         {Size, Opts},
-        {proper_types:range(1, 7), filter_gen()},
+        {proper_types:range(1, 7), opts_gen()},
         begin
             {Text, Pixels} = ecaptcha:pixels(Size, Opts),
             ?assertEqual(Size, byte_size(Text)),
@@ -56,8 +93,8 @@ prop_gif_no_crashes() ->
         case ecaptcha:gif(Size, Opts, Color) of
             {error, Reason} ->
                 lists:member(Reason, ?ERR_REASONS);
-            {Text, GifBytes} when is_binary(Text), is_binary(GifBytes) ->
-                true
+            {Text, GifBytes} when is_binary(Text) ->
+                iolist_size(GifBytes) > 0
         end
     ).
 
@@ -67,45 +104,28 @@ prop_gif_valid(doc) ->
 prop_gif_valid() ->
     ?FORALL(
         {Size, Opts, Color},
-        {proper_types:range(1, 7), filter_gen(), color_gen()},
+        {proper_types:range(1, 7), opts_gen(), color_gen()},
         begin
-            {Text, GifBytes} = ecaptcha:gif(Size, Opts, Color),
+            {Text, Gif} = ecaptcha:gif(Size, Opts, Color),
+            GifBin = iolist_to_binary(Gif),
             ?assertEqual(Size, byte_size(Text)),
-            ?assertEqual(17646, byte_size(GifBytes)),
-            ?assertMatch(<<"GIF89a", _/binary>>, GifBytes),
-            true
-        end
-    ).
-
-prop_nif_vs_erl_gif(doc) ->
-    "Compares NIF GIF encoder with ecaptcha_gif".
-
-prop_nif_vs_erl_gif() ->
-    ?FORALL(
-        {NumChars, Opts, Color},
-        {proper_types:range(1, 7), filter_gen(), color_gen()},
-        begin
-            {_Text, Pixels} = ecaptcha:pixels(NumChars, Opts),
-            ?assertEqual(
-                ecaptcha:pixels_as_gif(Pixels, Color),
-                iolist_to_binary(ecaptcha_gif:encode(Pixels, 200, 70, Color))
-            ),
+            ?assertEqual(17646, byte_size(GifBin)),
+            ?assertMatch(<<"GIF89a", _/binary>>, GifBin),
             true
         end
     ).
 
 %% PNG
 
-prop_png_no_crashes(doc) ->
-    "Checks that ecaptcha_png:encode/2 never crashes".
+prop_png_valid(doc) ->
+    "Checks that ecaptcha_png:encode/2 produces binary PNG for valid input".
 
-prop_png_no_crashes() ->
+prop_png_valid() ->
     ?FORALL(
         {NumChars, Opts, Color},
-        {proper_types:range(1, 7), filter_gen(), color_gen()},
+        {proper_types:range(1, 7), opts_gen(), color_gen()},
         begin
-            {_Text, Pixels} = ecaptcha:pixels(NumChars, Opts),
-            Png = ecaptcha_png:encode(Pixels, 200, 70, Color),
+            {_Text, Png} = ecaptcha:png(NumChars, Opts, Color),
             PngBin = iolist_to_binary(Png),
             ?assertMatch(<<137, "PNG\r\n", _/binary>>, PngBin),
             true
@@ -114,7 +134,7 @@ prop_png_no_crashes() ->
 
 %% Generator helpers
 
-filter_gen() ->
+opts_gen() ->
     proper_types:list(proper_types:oneof([line, blur, filter, dots])).
 
 color_gen() ->

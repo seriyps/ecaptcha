@@ -1,47 +1,11 @@
 // http://github.com/ITikhonov/captcha
 // https://github.com/huacnlee/rucaptcha
-const int gifsize;
-void captcha(const unsigned char* rand, unsigned char im[70*200], unsigned char l[8],
-             int length, int i_line, int i_blur, int i_filter, int i_dots);
-void makegif(unsigned char im[70*200], unsigned char gif[gifsize], int style);
-
 #include <stdint.h>
 #include <string.h>
 #include "erl_nif.h"
 #include "font.h"
-#include "colors.h"
 
 static int8_t *lt[];
-const int gifsize=17646;
-
-void makegif(unsigned char im[70*200], unsigned char gif[gifsize], int color_idx) {
-  // tag ; widthxheight ; GCT:0:0:7 ; bgcolor + aspect // GCT
-  // Image Separator // left x top // widthxheight // Flags
-  // LZW code size
-  memcpy(gif,colors[color_idx],13+48+10+1);
-
-  int x,y;
-  unsigned char *i=im;
-  unsigned char *p=gif+13+48+10+1;
-  for(y=0;y<70;y++) {
-    *p++=250; // Data length 5*50=250
-    for(x=0;x<50;x++)
-    {
-      unsigned char a=i[0]>>4,b=i[1]>>4,c=i[2]>>4,d=i[3]>>4;
-
-      p[0]=16|(a<<5);     // bbb10000
-      p[1]=(a>>3)|64|(b<<7);  // b10000xb
-      p[2]=b>>1;      // 0000xbbb
-      p[3]=1|(c<<1);    // 00xbbbb1
-      p[4]=4|(d<<3);    // xbbbb100
-      i+=4;
-      p+=5;
-    }
-  }
-
-  // Data length // End of LZW (b10001) // Terminator // GIF End
-  memcpy(gif+gifsize-4,"\x01" "\x11" "\x00" ";",4);
-}
 
 static const int8_t sw[200]=
     {
@@ -156,8 +120,8 @@ static void filter(unsigned char im[70*200]) {
 
 static const char *letters="abcdafahijklmnopqrstuvwxyz";
 
-void captcha(const unsigned char* rand, unsigned char im[70*200], unsigned char l[8],
-             int length, int i_line, int i_blur, int i_filter, int i_dots) {
+static void captcha(const unsigned char* rand, unsigned char im[70*200], unsigned char l[8],
+                    int length, int i_line, int i_blur, int i_filter, int i_dots) {
   unsigned char swr[200];
   uint8_t s1,s2;
   uint32_t dr[NDOTS];
@@ -187,7 +151,7 @@ void captcha(const unsigned char* rand, unsigned char im[70*200], unsigned char 
     line(im,swr,s1);
   }
   if (i_dots == 1) {
-      dots(im, dr);
+    dots(im, dr);
   }
   if (i_blur == 1) {
     blur(im);
@@ -225,16 +189,17 @@ mk_error(ErlNifEnv* env, const char* mesg)
 }
 
 static ERL_NIF_TERM
-mk_captcha(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[], int as_gif)
+mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     ERL_NIF_TERM opts_head, opts_tail, chars_bin, img_data_bin;
     ErlNifBinary rand_bin;
-    int len, color, i_line = 0, i_blur = 0, i_filter = 0, i_dots = 0;
+    int len, i_line = 0, i_blur = 0, i_filter = 0, i_dots = 0;
     char opt_name[8];
 
     unsigned char* chars;
+    unsigned char* img;
 
-    if( (as_gif && argc != 4) || (!as_gif && argc != 3) )
+    if( argc != 3 )
     {
         return enif_make_badarg(env);
     }
@@ -262,7 +227,7 @@ mk_captcha(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[], int as_gif)
     opts_tail = argv[2];
     while (enif_get_list_cell(env, opts_tail, &opts_head, &opts_tail)) {
         if(!enif_get_atom(env, opts_head, opt_name, sizeof(opt_name), ERL_NIF_LATIN1)) {
-            return mk_error(env, "non_atom_opt");
+            return mk_error(env, "non_atom_option");
         }
         if (!strcmp(opt_name, "line")) {
             i_line = 1;
@@ -276,77 +241,15 @@ mk_captcha(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[], int as_gif)
             return mk_error(env, "unknown_option");
         }
     }
-    if (as_gif) {
-        if(!enif_get_int(env, argv[3], &color)) {
-            return mk_error(env, "invalid_color");
-        }
-        if((color < 0) || (color > sizeof(colors))) {
-            return mk_error(env, "invalid_color");
-        }
-    }
     chars = enif_make_new_binary(env, len, &chars_bin);
-    if (as_gif) {
-        unsigned char img[70*200];
-        unsigned char* gif;
-        gif = enif_make_new_binary(env, gifsize, &img_data_bin);
+    img = enif_make_new_binary(env, 70*200, &img_data_bin);
 
-        captcha(rand_bin.data, img, chars, len, i_line, i_blur, i_filter, i_dots);
-        makegif(img, gif, color);
-        return enif_make_tuple2(env, chars_bin, img_data_bin);
-    } else {
-        unsigned char* img;
-        img = enif_make_new_binary(env, 70*200, &img_data_bin);
-
-        captcha(rand_bin.data, img, chars, len, i_line, i_blur, i_filter, i_dots);
-        return enif_make_tuple2(env, chars_bin, img_data_bin);
-    }
-
-}
-
-static ERL_NIF_TERM
-mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
-{
-    return mk_captcha(env, argc, argv, 0);
-}
-
-static ERL_NIF_TERM
-mk_gif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
-{
-    return mk_captcha(env, argc, argv, 1);
-}
-
-static ERL_NIF_TERM
-pixels_as_gif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
-{
-    ERL_NIF_TERM gif_data_bin;
-    ErlNifBinary im_bin;
-    unsigned char* gif;
-    int color;
-    if( argc != 2 )
-    {
-        return enif_make_badarg(env);
-    }
-    if(!enif_inspect_binary(env, argv[0], &im_bin)) {
-        return mk_error(env, "bad_image");
-    }
-    if(im_bin.size != (200 * 70)) {
-        return mk_error(env, "wrong_pixels_size");
-    }
-    if(!enif_get_int(env, argv[1], &color)) {
-        return mk_error(env, "invalid_color");
-    }
-    if((color < 0) || (color > sizeof(colors))) {
-        return mk_error(env, "invalid_color");
-    }
-    gif = enif_make_new_binary(env, gifsize, &gif_data_bin);
-    makegif(im_bin.data, gif, color);
-    return gif_data_bin;
+    captcha(rand_bin.data, img, chars, len, i_line, i_blur, i_filter, i_dots);
+    return enif_make_tuple2(env, chars_bin, img_data_bin);
 }
 
 static ErlNifFunc nif_funcs[] = {
-    {"pixels", 3, mk_pixels},
-    {"gif", 4, mk_gif},
-    {"pixels_as_gif", 2, pixels_as_gif}
+    {"pixels", 3, mk_pixels}
 };
 
 ERL_NIF_INIT(ecaptcha_nif, nif_funcs, NULL, NULL, NULL, NULL);
