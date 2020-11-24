@@ -2,13 +2,14 @@
 
 -export([pixels/2, gif/3, png/3]).
 
--export_type([opts/0, color_name/0, err_reason/0]).
+-export_type([opts/0, color_name/0, color_rgb/0, err_reason/0]).
 
 -define(APPNAME, ecaptcha).
 -define(LIBNAME, ecaptcha).
 
 -type opts() :: [line | blur | filter | dots].
 -type color_name() :: ecaptcha_color:color_name().
+-type color_rgb() :: ecaptcha_color:rgb().
 -type err_reason() ::
     chars_not_binary
     | wrong_chars_length
@@ -38,7 +39,7 @@ pixels(NumChars, Opts) ->
 gif(NumChars, Opts, Color) ->
     img(NumChars, Opts, Color, fun ecaptcha_gif:encode/4).
 
--spec png(NumChars :: pos_integer(), opts(), color_name()) ->
+-spec png(NumChars :: pos_integer(), opts(), color_name() | color_rgb()) ->
     {Str :: binary(), GifImg :: binary()}
     | {error, err_reason()}.
 png(NumChars, Opts, Color) ->

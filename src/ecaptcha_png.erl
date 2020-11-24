@@ -7,17 +7,33 @@
 
 %% Pixels is a greyscale 1 byte per pixel, 0 = black, 255 = white.
 %% row-by-row, from top-left to bottom-right.
--spec encode(binary(), pos_integer(), pos_integer(), ecaptcha:color_name()) -> iodata().
+-spec encode(
+    binary(),
+    pos_integer(),
+    pos_integer(),
+    ecaptcha:color_name() | ecaptcha:color_rgb()
+) -> iodata().
+encode(Pixels, Width, Height, ColorName) when is_atom(ColorName) ->
+    encode(Pixels, Width, Height, ecaptcha_color:by_name(ColorName));
 encode(Pixels, 200 = Width, 70 = Height, Color) when byte_size(Pixels) =:= (Width * Height) ->
     Signature = <<137, "PNG", "\r\n", 26, "\n">>,
-    Palette = mk_palette(Pixels, Color),
+    %% we abuse the fact that color indexes in RGB and 8bit palette are the same, so we encode
+    %% colors in "PLTE" section from RGB palette, but use 8bit palette for "IDAT" lookups, because
+    %% `Pixels' are 8bit (greyscale).
+    {Palette8bit, PaletteRGB} = build_palette(Pixels, Color),
     [
         Signature,
         chunk(<<"IHDR">>, mk_hdr(Width, Height)),
-        chunk(<<"PLTE">>, Palette),
-        chunk(<<"IDAT">>, mk_data(Pixels, Width, Palette)),
+        chunk(<<"PLTE">>, mk_palette(PaletteRGB)),
+        chunk(<<"IDAT">>, mk_data(Pixels, Width, Palette8bit)),
         chunk(<<"IEND">>, <<>>)
     ].
+
+build_palette(Pixels, Color) ->
+    Histogram8bit = ecaptcha_color:histogram_from_8b_pixels(Pixels),
+    HistogramRGB = ecaptcha_color:histogram_map_channel_to_rgb(Histogram8bit, Color),
+    {ecaptcha_color:palette_from_histogram(Histogram8bit),
+        ecaptcha_color:palette_from_histogram(HistogramRGB)}.
 
 %% erlfmt-ignore
 mk_hdr(Width, Height) ->
@@ -31,22 +47,19 @@ mk_hdr(Width, Height) ->
       0                                         % InterlaceMethod - no interlace
     >>.
 
-mk_palette(_Pixels, Color) ->
-    [ecaptcha_color:bin_3b(ecaptcha_color:by_name(C)) || C <- [Color, white]].
+mk_palette(PaletteRGB) ->
+    Colors = ecaptcha_color:palette_colors_by_frequency(PaletteRGB),
+    lists:map(fun ecaptcha_color:bin_3b/1, Colors).
 
 mk_data(Pixels, Width, Palette) ->
     zlib:compress([mk_row(Row, Palette) || <<Row:Width/binary>> <= Pixels]).
 
-mk_row(RowPixels, _Palette) ->
+mk_row(RowPixels, Palette8bit) ->
     [
+        % Filter type - None
         0,
         <<
-            <<(case Pixel < 255 of
-                    % 0 - index in Palette (black)
-                    true -> 0;
-                    % 1 - index in Palette (white)
-                    false -> 1
-                end)>>
+            <<(ecaptcha_color:palette_get_index(Pixel, Palette8bit))>>
             || <<Pixel>> <= RowPixels
         >>
     ].

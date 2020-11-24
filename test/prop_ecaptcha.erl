@@ -124,6 +124,22 @@ prop_png_valid() ->
         end
     ).
 
+prop_png_rgb_valid(doc) ->
+    "Checks that ecaptcha_png:encode/2 produces PNG for valid input with arbitrary RGB colors".
+
+prop_png_rgb_valid() ->
+    ?FORALL(
+        {NumChars, Opts, Color},
+        {proper_types:range(1, 7), opts_gen(), rgb_gen()},
+        begin
+            {_Text, Png} = ecaptcha:png(NumChars, Opts, Color),
+            PngBin = iolist_to_binary(Png),
+            %% dump("tst_~s_~s_~p.png", _Text, Opts, Color, Png),
+            ?assertMatch(<<137, "PNG\r\n", _/binary>>, PngBin),
+            true
+        end
+    ).
+
 %% Generator helpers
 
 opts_gen() ->
@@ -131,6 +147,11 @@ opts_gen() ->
 
 color_gen() ->
     proper_types:oneof([black, red, orange, blue, pink, purple]).
+
+rgb_gen() ->
+    {proper_types:range(0, 255),
+     proper_types:range(0, 255),
+     proper_types:range(0, 255)}.
 
 alpha_gen(Min, Max) ->
     ?LET(
