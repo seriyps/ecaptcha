@@ -15,12 +15,12 @@
 ) -> iodata().
 encode(Pixels, Width, Height, ColorName) when is_atom(ColorName) ->
     encode(Pixels, Width, Height, ecaptcha_color:by_name(ColorName));
-encode(Pixels, 200 = Width, 70 = Height, Color) when byte_size(Pixels) =:= (Width * Height) ->
+encode(Pixels, Width, Height, Color) when byte_size(Pixels) =:= (Width * Height) ->
     Signature = <<137, "PNG", "\r\n", 26, "\n">>,
     %% we abuse the fact that color indexes in RGB and 8bit palette are the same, so we encode
     %% colors in "PLTE" section from RGB palette, but use 8bit palette for "IDAT" lookups, because
     %% `Pixels' are 8bit (greyscale).
-    {Palette8bit, PaletteRGB} = build_palette(Pixels, Color),
+    {Palette8bit, PaletteRGB} = ecaptcha_color:map_palettes(Pixels, Color),
     [
         Signature,
         chunk(<<"IHDR">>, mk_hdr(Width, Height)),
@@ -28,12 +28,6 @@ encode(Pixels, 200 = Width, 70 = Height, Color) when byte_size(Pixels) =:= (Widt
         chunk(<<"IDAT">>, mk_data(Pixels, Width, Palette8bit)),
         chunk(<<"IEND">>, <<>>)
     ].
-
-build_palette(Pixels, Color) ->
-    Histogram8bit = ecaptcha_color:histogram_from_8b_pixels(Pixels),
-    HistogramRGB = ecaptcha_color:histogram_map_channel_to_rgb(Histogram8bit, Color),
-    {ecaptcha_color:palette_from_histogram(Histogram8bit),
-        ecaptcha_color:palette_from_histogram(HistogramRGB)}.
 
 %% erlfmt-ignore
 mk_hdr(Width, Height) ->

@@ -6,6 +6,8 @@
     palette_from_histogram/1,
     palette_colors_by_frequency/1,
     palette_get_index/2,
+    palette_size/1,
+    map_palettes/2,
     histogram_from_8b_pixels/1,
     histogram_map_channel_to_rgb/2
 ]).
@@ -73,6 +75,19 @@ palette_from_histogram(Histogram) ->
 -spec palette_get_index(Color, palette(Color)) -> non_neg_integer().
 palette_get_index(Color, #palette{lookup_tab = LookupTab}) ->
     maps:get(Color, LookupTab).
+
+%% @doc Number of colors in palette
+-spec palette_size(palette(channel() | rgb())) -> non_neg_integer().
+palette_size(#palette{histogram = Hist}) ->
+    map_size(Hist).
+
+%% @doc Create 2 palettes to map greyscale pixels to RGB color
+-spec map_palettes(binary(), rgb()) -> {palette(channel()), palette(rgb())}.
+map_palettes(Pixels, Color) ->
+    Histogram8bit = histogram_from_8b_pixels(Pixels),
+    HistogramRGB = histogram_map_channel_to_rgb(Histogram8bit, Color),
+    {palette_from_histogram(Histogram8bit),
+        palette_from_histogram(HistogramRGB)}.
 
 %% @doc Returns a list with colors sorted by their frequency in desc order (most frequent first)
 %%

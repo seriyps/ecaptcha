@@ -19,3 +19,4 @@ _build
 rebar3.crashdump
 *~
 c_src/unfont
+erlang_ls.config

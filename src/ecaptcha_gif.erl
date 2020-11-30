@@ -6,80 +6,116 @@
 
 -export([encode/4]).
 
--spec encode(binary(), pos_integer(), pos_integer(), ecaptcha:color_name()) -> iodata().
-encode(Pixels, 200 = Width, 70 = Height, Color) when byte_size(Pixels) =:= (Width * Height) ->
+%% For tests
+-export([min_bits_to_fit/1]).
+
+-spec encode(
+    binary(),
+    pos_integer(),
+    pos_integer(),
+    ecaptcha:color_name() | ecaptcha:color_rgb()
+) -> iodata().
+encode(Pixels, Width, Height, ColorName) when is_atom(ColorName) ->
+    encode(Pixels, Width, Height, ecaptcha_color:by_name(ColorName));
+encode(Pixels, Width, Height, Color) when byte_size(Pixels) =:= (Width * Height) ->
+    {Palette8bit, PaletteRGB} = ecaptcha_color:map_palettes(Pixels, Color),
     [
-        header(Width, Height, Color),
-        encode_rows(Pixels, Width, Height, <<>>),
+        header(Width, Height, PaletteRGB),
+        encode_raster_data(Pixels, Palette8bit),
         trailer()
     ].
 
 %% Header
 
-header(Width, Height, Color) ->
-    [header0(Width, Height), palette(Color), header1(Width, Height)].
+header(Width, Height, PaletteRGB) ->
+    NumColors = ecaptcha_color:palette_size(PaletteRGB),
+    ColorsRGB = ecaptcha_color:palette_colors_by_frequency(PaletteRGB),
+    [
+        screen_descriptor(Width, Height, NumColors),
+        palette(ColorsRGB),
+        image_descriptor(Width, Height)
+    ].
 
 %% erlfmt-ignore
-header0(Width, Height) ->
+screen_descriptor(Width, Height, PaletteSize) ->
+    Bits = min_bits_to_fit(PaletteSize) - 1,
     <<
       "GIF89a",
       Width:16/little,                          % Logical screen width
       Height:16/little,                         % Logical screen height
       1:1,                                      % GCTFlag:1 - 1 - Global Color Table exists
-      0:3,                                      % ColorResolution:3
+      Bits:3,                                   % ColorResolution:3
       0:1,                                      % SortFlag:1 - 0 - not sorted
-      3:3,                                      % GCTSize:3 - `2^(3+1)' - size of GCT
+      Bits:3,                                   % GCTSize:3 - `2^(3+1)' - size of GCT
       0,                                        % BackgroundColor index in palette
       0                                         % Aspect ratio
     >>.
 
-palette(Color) ->
-    Bytes = ecaptcha_color:bin_3b(ecaptcha_color:by_name(Color)),
-    [
-        binary:copy(Bytes, 15),
-        ecaptcha_color:bin_3b(ecaptcha_color:by_name(white))
-    ].
+palette(ColorsRGB) ->
+    %% Palette size must be power of 2. If number of colors is not exactly power of 2, we fill
+    %% extra space with dumy color (white).
+    NumColors = length(ColorsRGB),
+    PaletteLenBits = min_bits_to_fit(NumColors),
+    % 2 ^ PaletteLenBits
+    PaletteSize = 1 bsl PaletteLenBits,
+    NumDummyColors = PaletteSize - NumColors,
+    White = ecaptcha_color:by_name(white),
+    PaletteAndDummy = ColorsRGB ++ lists:duplicate(NumDummyColors, White),
+    lists:map(fun ecaptcha_color:bin_3b/1, PaletteAndDummy).
+
+min_bits_to_fit(Size) ->
+    if
+        Size =< 2 -> 1;
+        Size =< 4 -> 2;
+        Size =< 8 -> 3;
+        Size =< 16 -> 4;
+        Size =< 32 -> 5;
+        Size =< 64 -> 6;
+        Size =< 128 -> 7;
+        Size =< 256 -> 8;
+        true -> error(size_overflow)
+    end.
 
 %% erlfmt-ignore
-header1(Width, Height) ->
+image_descriptor(Width, Height) ->
     <<
       ",",
       0:16/little, 0:16/little,                 % (x0, y0) - start of image
       Width:16/little, Height:16/little,        % (xN, yN) - end of image
-      0,                                        % no local color table
-      16#4                                      % LZW minimum code size
+      0:1,                                      % no local color table
+      0:1,                                      % sequential order (not interlaced)
+      0:3,                                      % reserved
+      0:3                                       % Local color table size
     >>.
 
 %% Body
 
-encode_rows(<<>>, _, 0, Acc) ->
-    Acc;
-encode_rows(Pixels, X, Y, Acc) ->
-    <<RowPixels:X/binary, PixelsTail/binary>> = Pixels,
-    % 250
-    RowSize = (X div 4) * 5,
-    Acc1 = encode_row(RowPixels, <<Acc/binary, RowSize>>),
-    encode_rows(PixelsTail, X, Y - 1, Acc1).
+encode_raster_data(Pixels, Palette8bit) ->
+    PalettePixels = map_to_palette(Pixels, Palette8bit),
+    CodeSize = min_bits_to_fit(ecaptcha_color:palette_size(Palette8bit)),
+    Compressed = ecaptcha_gif_lzw:compress(PalettePixels, CodeSize),
+    % LZW minimum code size
+    [CodeSize | encode_chunks(Compressed)].
 
-%% No idea how this works. Blindly translated from ecaptcha.c#makegif
-%% erlfmt-ignore
-encode_row(<<A0, B0, C0, D0, Rest/binary>>, Acc) ->
-    A = A0 bsr 4,
-    B = B0 bsr 4,
-    C = C0 bsr 4,
-    D = D0 bsr 4,
-    encode_row(
-        Rest,
-        <<Acc/binary,
-          (16 bor (A bsl 5)),
-          ((A bsr 3) bor 64 bor ((B bsl 7) rem 256)),
-          (B bsr 1),
-          (1 bor (C bsl 1)),
-          (4 bor (D bsl 3))>>
-    );
-encode_row(<<>>, Acc) ->
-    Acc.
+map_to_palette(Pixels, Palette8bit) ->
+    <<
+        <<(ecaptcha_color:palette_get_index(Pixel, Palette8bit))>>
+        || <<Pixel>> <= Pixels
+    >>.
+
+encode_chunks(<<Chunk:255/binary, Tail/binary>>) ->
+    [255, Chunk | encode_chunks(Tail)];
+encode_chunks(<<>>) ->
+    %Stream terminator
+    [0];
+encode_chunks(Remaining) ->
+    [
+        byte_size(Remaining),
+        Remaining,
+        %Stream terminator
+        0
+    ].
 
 %% Trailer
 trailer() ->
-    <<16#01, 16#11, 0, ";">>.
+    <<";">>.
