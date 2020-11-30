@@ -234,15 +234,25 @@ prop_png_rgb_valid(doc) ->
     "Checks that ecaptcha_png:encode/2 produces PNG for valid input with arbitrary RGB colors".
 
 prop_png_rgb_valid() ->
+    exec:start([]),
     ?FORALL(
         {NumChars, Opts, Color},
         {proper_types:range(1, 7), opts_gen(), rgb_gen()},
         begin
-            {_Text, Png} = ecaptcha:png(NumChars, Opts, Color),
+            {Text, Png} = ecaptcha:png(NumChars, Opts, Color),
             PngBin = iolist_to_binary(Png),
-            %% dump("tst_~s_~s_~p.png", _Text, Opts, Color, Png),
             ?assertMatch(<<137, "PNG\r\n", _/binary>>, PngBin),
-            true
+            Res = identify(PngBin),
+            ?WHENFAIL(
+                begin
+                    dump("tst_~s_~s_~s.png", Text, Opts, Color, Png),
+                    io:format(
+                        "In: ~p~nRes: ~120p~n",
+                        [{NumChars, Opts, Color}, Res]
+                    )
+                end,
+                normal == maps:get(code, Res)
+            )
         end
     ).
 
@@ -276,29 +286,16 @@ prop_png_gradient_identify() ->
         end
     ).
 
-prop_map_palettes_consistent() ->
-    ?FORALL(
-       {Pixels, Color},
-       {proper_types:non_empty(proper_types:binary()), rgb_gen()},
-       begin
-           %% Pixels = list_to_binary(lists:seq(0, MaxGreyscale)),
-           {Palette8bit, PaletteRGB} = ecaptcha_color:map_palettes(Pixels, Color),
-           ?assertEqual(ecaptcha_color:palette_size(Palette8bit),
-                        ecaptcha_color:palette_size(PaletteRGB)),
-           true
-       end
-      ).
-
 prop_map_histogram_consistent() ->
     ?FORALL(
        {Pixels, Color},
        {proper_types:non_empty(proper_types:binary()), rgb_gen()},
        begin
            Histogram8b = ecaptcha_color:histogram_from_8b_pixels(Pixels),
-           HistogramRGB = ecaptcha_color:histogram_map_channel_to_rgb(Histogram8b, Color),
+           Mapping = ecaptcha_color:histogram_map_channel_to_rgb(Histogram8b, Color),
            ?WHENFAIL(
-              io:format("Hist8b:~p~nHistRGB:~p~n", [Histogram8b, HistogramRGB]),
-              map_size(Histogram8b) == map_size(HistogramRGB))
+              io:format("Hist8b:~p~nMapping:~p~n", [Histogram8b, Mapping]),
+              map_size(Histogram8b) == length(Mapping))
        end).
 
 %% Generator helpers

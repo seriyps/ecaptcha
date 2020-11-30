@@ -18,21 +18,20 @@
 encode(Pixels, Width, Height, ColorName) when is_atom(ColorName) ->
     encode(Pixels, Width, Height, ecaptcha_color:by_name(ColorName));
 encode(Pixels, Width, Height, Color) when byte_size(Pixels) =:= (Width * Height) ->
-    {Palette8bit, PaletteRGB} = ecaptcha_color:map_palettes(Pixels, Color),
+    {PaletteRGB, IndexLookup} = ecaptcha_color:map_palettes(Pixels, Color),
     [
         header(Width, Height, PaletteRGB),
-        encode_raster_data(Pixels, Palette8bit),
+        encode_raster_data(Pixels, IndexLookup, length(PaletteRGB)),
         trailer()
     ].
 
 %% Header
 
 header(Width, Height, PaletteRGB) ->
-    NumColors = ecaptcha_color:palette_size(PaletteRGB),
-    ColorsRGB = ecaptcha_color:palette_colors_by_frequency(PaletteRGB),
+    NumColors = length(PaletteRGB),
     [
         screen_descriptor(Width, Height, NumColors),
-        palette(ColorsRGB),
+        palette(PaletteRGB),
         image_descriptor(Width, Height)
     ].
 
@@ -90,16 +89,16 @@ image_descriptor(Width, Height) ->
 
 %% Body
 
-encode_raster_data(Pixels, Palette8bit) ->
-    PalettePixels = map_to_palette(Pixels, Palette8bit),
-    CodeSize = min_bits_to_fit(ecaptcha_color:palette_size(Palette8bit)),
+encode_raster_data(Pixels, IndexLookup, PaletteSize) ->
+    PalettePixels = map_to_palette(Pixels, IndexLookup),
+    CodeSize = max(min_bits_to_fit(PaletteSize), 2),
     Compressed = ecaptcha_gif_lzw:compress(PalettePixels, CodeSize),
     % LZW minimum code size
     [CodeSize | encode_chunks(Compressed)].
 
-map_to_palette(Pixels, Palette8bit) ->
+map_to_palette(Pixels, IndexLookup) ->
     <<
-        <<(ecaptcha_color:palette_get_index(Pixel, Palette8bit))>>
+        <<(maps:get(Pixel, IndexLookup))>>
         || <<Pixel>> <= Pixels
     >>.
 

@@ -81,13 +81,26 @@ palette_get_index(Color, #palette{lookup_tab = LookupTab}) ->
 palette_size(#palette{histogram = Hist}) ->
     map_size(Hist).
 
-%% @doc Create 2 palettes to map greyscale pixels to RGB color
--spec map_palettes(binary(), rgb()) -> {palette(channel()), palette(rgb())}.
+%% @doc Create list of RGB colors sorted by frequency + map from greyscale to indexes in RGB list
+-spec map_palettes(binary(), rgb()) -> {[rgb()], #{channel() => non_neg_integer()}}.
 map_palettes(Pixels, Color) ->
+    %% We need 2 strctures:
+    %% 1. List of RGB colors sorted by frequency {freq_index(), rgb()}
+    %% 2. Mapping from greyscale to freq_index() (can have duplicates)
     Histogram8bit = histogram_from_8b_pixels(Pixels),
-    HistogramRGB = histogram_map_channel_to_rgb(Histogram8bit, Color),
-    {palette_from_histogram(Histogram8bit),
-        palette_from_histogram(HistogramRGB)}.
+    Mapping = histogram_map_channel_to_rgb(Histogram8bit, Color), % [{rgb(), channel(), freq()}]
+    %% one channel() can map to more than one rgb()
+    ChannelToRGB = maps:from_list([{Ch, RGB} || {RGB, Ch, _} <- Mapping]),
+    %% RGBHistogram can be smaller than ChannelToRGB
+    RGBHistogram = lists:foldl(fun({RGB, _, Freq}, Acc) ->
+                                       Freq0 = maps:get(RGB, Acc, 0),
+                                       Acc#{RGB => Freq0 + Freq}
+                               end, #{}, Mapping),
+    %% [{rgb(), freq_index()}], sorted by freq_index()
+    RGBByFreq = indexed_from_histogram(RGBHistogram),
+    FreqIndexByRGB = maps:from_list(RGBByFreq),
+    ChannelToIndex = maps:map(fun(_Ch, RGB) -> maps:get(RGB, FreqIndexByRGB) end, ChannelToRGB),
+    {[RGB || {RGB, _Idx} <- RGBByFreq], ChannelToIndex}.
 
 %% @doc Returns a list with colors sorted by their frequency in desc order (most frequent first)
 %%
@@ -98,6 +111,9 @@ palette_colors_by_frequency(#palette{histogram = Histogram}) ->
     Colors.
 
 lookup_from_histogram(Histogram) ->
+    maps:from_list(indexed_from_histogram(Histogram)).
+
+indexed_from_histogram(Histogram) ->
     Sorted = hist_sort_by_frequency(Histogram),
     {LookupList, _Size} = lists:mapfoldl(
         fun({Color, _}, Idx) ->
@@ -106,7 +122,7 @@ lookup_from_histogram(Histogram) ->
         0,
         Sorted
     ),
-    maps:from_list(LookupList).
+    LookupList.
 
 hist_sort_by_frequency(Hist) ->
     lists:sort(
@@ -124,20 +140,21 @@ hist_sort_by_frequency(Hist) ->
 histogram_from_8b_pixels(Pixels) ->
     histogram_from_8b_pixels(Pixels, #{}).
 
-histogram_from_8b_pixels(<<>>, Palette) ->
-    Palette;
-histogram_from_8b_pixels(<<Pixel, Pixels/binary>>, Palette) ->
-    Count = maps:get(Pixel, Palette, 0),
-    histogram_from_8b_pixels(Pixels, Palette#{Pixel => Count + 1}).
+histogram_from_8b_pixels(<<>>, Hist) ->
+    Hist;
+histogram_from_8b_pixels(<<Pixel, Pixels/binary>>, Hist) ->
+    Count = maps:get(Pixel, Hist, 0),
+    histogram_from_8b_pixels(Pixels, Hist#{Pixel => Count + 1}).
 
 %% @doc Maps 8bit greyscale color histogram to the RGB color.
 %%
 %% This is to, kind of, use colors from greyscale as a "saturation" value for RGB color.
 %% Or, to convert a greyscale image to a single-color-tone image.
--spec histogram_map_channel_to_rgb(histogram(channel()), rgb()) -> histogram(rgb()).
+-spec histogram_map_channel_to_rgb(histogram(channel()), rgb()) ->
+          [{rgb(), channel(), Freq :: pos_integer()}].
 histogram_map_channel_to_rgb(Histogram8b, RGB) ->
     {Pixels, Frequences} = lists:unzip(maps:to_list(Histogram8b)),
-    maps:from_list(lists:zip(palette_map_channel_to_rgb(Pixels, RGB), Frequences)).
+    lists:zip3(palette_map_channel_to_rgb(Pixels, RGB), Pixels, Frequences).
 
 palette_map_channel_to_rgb(Pixels8b, {R, G, B}) ->
     %% It's a bit similar to changing "Saturation" in HSV color model, but not really
