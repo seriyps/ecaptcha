@@ -3,16 +3,15 @@
 
 -export([new/3, by_name/1, bin_3b/1]).
 -export([
-    palette_from_histogram/1,
     palette_colors_by_frequency/1,
     palette_get_index/2,
     palette_size/1,
-    map_palettes/2,
+    new_palette/2,
     histogram_from_8b_pixels/1,
     histogram_map_channel_to_rgb/2
 ]).
 
--export_type([color_name/0, rgb/0]).
+-export_type([color_name/0, rgb/0, palette/0]).
 
 %single greyscale value
 -type channel() :: byte().
@@ -47,43 +46,34 @@ by_name(white) ->
 %% Palette
 %%
 -type histogram(Color) :: #{Color => pos_integer()}.
--type lookup_tab(Color) :: #{Color => non_neg_integer()}.
 
 -record(palette, {
-    histogram :: histogram(channel() | rgb()),
-    lookup_tab :: lookup_tab(channel() | rgb())
+    colors :: [rgb()],
+    lookup_tab :: #{channel() => non_neg_integer()}
 }).
 
--type palette(Color) :: #palette{
-    histogram :: histogram(Color),
-    lookup_tab :: lookup_tab(Color)
-}.
-
-%% @doc Creates palette from color frequency diagram
-%%
-%% Palette can be used during image encoding, it maps colors to color indexes in palette.
-%% Colors are indexed by descending frequency (0 - most frequent).
--spec palette_from_histogram(histogram(Color)) -> palette(Color).
-palette_from_histogram(Histogram) ->
-    LookupTab = lookup_from_histogram(Histogram),
-    #palette{
-        histogram = Histogram,
-        lookup_tab = LookupTab
-    }.
+-opaque palette() :: #palette{}.
 
 %% @doc Get color index from palette
--spec palette_get_index(Color, palette(Color)) -> non_neg_integer().
+-spec palette_get_index(channel(), palette()) -> non_neg_integer().
 palette_get_index(Color, #palette{lookup_tab = LookupTab}) ->
     maps:get(Color, LookupTab).
 
 %% @doc Number of colors in palette
--spec palette_size(palette(channel() | rgb())) -> non_neg_integer().
-palette_size(#palette{histogram = Hist}) ->
-    map_size(Hist).
+-spec palette_size(palette()) -> non_neg_integer().
+palette_size(#palette{colors = Colors}) ->
+    length(Colors).
 
-%% @doc Create list of RGB colors sorted by frequency + map from greyscale to indexes in RGB list
--spec map_palettes(binary(), rgb()) -> {[rgb()], #{channel() => non_neg_integer()}}.
-map_palettes(Pixels, Color) ->
+%% @doc Returns a list with colors sorted by their frequency in desc order (most frequent first)
+%%
+%% Colors with the same frequency are sorted by value
+-spec palette_colors_by_frequency(palette()) -> [rgb()].
+palette_colors_by_frequency(#palette{colors = Colors}) ->
+    Colors.
+
+%% @doc Create a palette by mapping Greyscale raster to RGB color
+-spec new_palette(binary(), rgb()) -> palette().
+new_palette(Pixels, Color) ->
     %% We need 2 strctures:
     %% 1. List of RGB colors sorted by frequency {freq_index(), rgb()}
     %% 2. Mapping from greyscale to freq_index() (can have duplicates)
@@ -100,18 +90,8 @@ map_palettes(Pixels, Color) ->
     RGBByFreq = indexed_from_histogram(RGBHistogram),
     FreqIndexByRGB = maps:from_list(RGBByFreq),
     ChannelToIndex = maps:map(fun(_Ch, RGB) -> maps:get(RGB, FreqIndexByRGB) end, ChannelToRGB),
-    {[RGB || {RGB, _Idx} <- RGBByFreq], ChannelToIndex}.
-
-%% @doc Returns a list with colors sorted by their frequency in desc order (most frequent first)
-%%
-%% Colors with the same frequency are sorted by value
--spec palette_colors_by_frequency(palette(Color)) -> [Color].
-palette_colors_by_frequency(#palette{histogram = Histogram}) ->
-    {Colors, _} = lists:unzip(hist_sort_by_frequency(Histogram)),
-    Colors.
-
-lookup_from_histogram(Histogram) ->
-    maps:from_list(indexed_from_histogram(Histogram)).
+    #palette{colors = [RGB || {RGB, _Idx} <- RGBByFreq],
+             lookup_tab = ChannelToIndex}.
 
 indexed_from_histogram(Histogram) ->
     Sorted = hist_sort_by_frequency(Histogram),

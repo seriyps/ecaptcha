@@ -92,7 +92,7 @@ prop_gif_no_crashes(doc) ->
 prop_gif_no_crashes() ->
     ?FORALL(
         {Size, Opts, Color},
-        {proper_types:range(1, 7), proper_types:any(), color_gen()},
+        {proper_types:range(1, 7), proper_types:list(), color_gen()},
         case ecaptcha:gif(Size, Opts, Color) of
             {error, Reason} ->
                 lists:member(Reason, ?ERR_REASONS);
@@ -134,27 +134,39 @@ prop_gif_gradient_identify(doc) ->
 prop_gif_gradient_identify() ->
     exec:start([]),
     ?FORALL(
-        {X, Y, NColors},
+        {X, Y, NColors, Color},
         ?LET(
             {X0, Y0},
-            {proper_types:range(4, 500), proper_types:range(4, 500)},
+            {proper_types:range(1, 1000), proper_types:range(1, 1000)},
             begin
                 MaxColors = min(X0 * Y0, 256),
-                {X0, Y0, proper_types:range(3, MaxColors)}
+                {X0, Y0, proper_types:range(2, MaxColors), rgb_gen()}
             end
         ),
         begin
             Colors = lists:seq(0, NColors - 1),
             Pixels = mk_pixels(Colors, X * Y),
-            Iodata = ecaptcha_gif:encode(Pixels, X, Y, black),
-            Res = identify(Iodata),
-            ?WHENFAIL(
-                io:format(
-                    "In: ~p~nPixels: ~120p~nRes: ~120p~n",
-                    [{X, Y, NColors}, Pixels, Res]
-                ),
-                normal == maps:get(code, Res)
-            )
+            Iodata = ecaptcha_gif:encode(Pixels, X, Y, Color),
+            %% Images of above ~66kb for some reason cause errors in `identify`
+            case iolist_size(Iodata) > 65500 of
+                true ->
+                    true;
+                false ->
+                    Res = identify(Iodata),
+                    ?WHENFAIL(
+                       begin
+                           dump("err_~wx~w_ncolors~w_color~p.gif", [X, Y, NColors, Color], Iodata),
+                           io:format(
+                             "In: ~p~nRes: ~120p~n",
+                             [{X, Y, NColors}, Res])
+                       end,
+                       proper:conjunction(
+                         [{code_normal, normal == maps:get(code, Res)},
+                          {no_io_err, [] == maps:get(err, Res, [])},
+                          {no_stderr, [] == maps:get(stderr, Res, [])}]
+                        )
+                      )
+            end
         end
     ).
 
@@ -167,7 +179,7 @@ prop_gif_lzw_vs_py() ->
         {Len, NColors},
         ?LET(
             Len0,
-            proper_types:range(4, 2000),
+            proper_types:range(2, 2000),
             begin
                 MaxColors = min(Len0, 256),
                 {Len0, proper_types:range(3, MaxColors)}
@@ -265,7 +277,7 @@ prop_png_gradient_identify() ->
         {X, Y, NColors, Color},
         ?LET(
             {X0, Y0},
-            {proper_types:range(4, 1000), proper_types:range(4, 1000)},
+            {proper_types:range(1, 1000), proper_types:range(1, 1000)},
             begin
                 MaxColors = min(X0 * Y0, 256),
                 {X0, Y0, proper_types:range(3, MaxColors), rgb_gen()}
@@ -281,7 +293,10 @@ prop_png_gradient_identify() ->
                     "In: ~p~nPixels: ~120p~nRes: ~120p~n",
                     [{X, Y, NColors}, Pixels, Res]
                 ),
-                normal == maps:get(code, Res)
+               proper:conjunction(
+                 [{code_normal, normal == maps:get(code, Res)},
+                  {no_io_err, [] == maps:get(err, Res, [])}]
+                 )
             )
         end
     ).
@@ -342,9 +357,24 @@ lzw_py(Iodata, MinCode) ->
 exec(Cmd, Args, Input) ->
     FullCmd = Cmd ++ lists:flatten([[" " | A] || A <- Args]),
     {ok, Pid, OsPid} = exec:run(FullCmd, [stdin, stdout, stderr, monitor]),
-    ok = exec:send(Pid, iolist_to_binary(Input)),
-    ok = exec:send(Pid, eof),
-    recv(OsPid, #{}).
+    Res0 =
+    try
+        ok = send_chunks(Pid, iolist_to_binary(Input)),
+        %% ok = exec:send(Pid, iolist_to_binary(Input)),
+        ok = exec:send(Pid, eof),
+        #{}
+    catch T:R:S ->
+            exec:start([]),
+            #{err => {T, R, S}}
+    end,
+    recv(OsPid, Res0).
+
+send_chunks(Pid, <<Chunk:2048/binary, Tail/binary>>) ->
+    ok = exec:send(Pid, Chunk),
+    send_chunks(Pid, Tail);
+send_chunks(Pid, Tail) ->
+    exec:send(Pid, Tail).
+
 
 recv(OsPid, Acc) ->
     receive
@@ -357,7 +387,10 @@ recv(OsPid, Acc) ->
     after 5000 -> error({timeout, Acc})
     end.
 
+dump(Fmt, Params, Data) ->
+    Name = lists:flatten(io_lib:format(Fmt, Params)),
+    ok = file:write_file(Name, Data).
+
 dump(Fmt, Text, Opts, Color, Data) ->
     OptsStr = lists:join(",", lists:map(fun erlang:atom_to_binary/1, lists:usort(Opts))),
-    Name = lists:flatten(io_lib:format(Fmt, [Text, OptsStr, Color])),
-    ok = file:write_file(Name, Data).
+    dump(Fmt, [Text, OptsStr, Color], Data).

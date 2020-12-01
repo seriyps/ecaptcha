@@ -18,20 +18,20 @@
 encode(Pixels, Width, Height, ColorName) when is_atom(ColorName) ->
     encode(Pixels, Width, Height, ecaptcha_color:by_name(ColorName));
 encode(Pixels, Width, Height, Color) when byte_size(Pixels) =:= (Width * Height) ->
-    {PaletteRGB, IndexLookup} = ecaptcha_color:map_palettes(Pixels, Color),
+    Palette = ecaptcha_color:new_palette(Pixels, Color),
     [
-        header(Width, Height, PaletteRGB),
-        encode_raster_data(Pixels, IndexLookup, length(PaletteRGB)),
+        header(Width, Height, Palette),
+        encode_raster_data(Pixels, Palette),
         trailer()
     ].
 
 %% Header
 
-header(Width, Height, PaletteRGB) ->
-    NumColors = length(PaletteRGB),
+header(Width, Height, Palette) ->
+    NumColors = ecaptcha_color:palette_size(Palette),
     [
         screen_descriptor(Width, Height, NumColors),
-        palette(PaletteRGB),
+        palette(Palette),
         image_descriptor(Width, Height)
     ].
 
@@ -50,10 +50,11 @@ screen_descriptor(Width, Height, PaletteSize) ->
       0                                         % Aspect ratio
     >>.
 
-palette(ColorsRGB) ->
+palette(Palette) ->
     %% Palette size must be power of 2. If number of colors is not exactly power of 2, we fill
     %% extra space with dumy color (white).
-    NumColors = length(ColorsRGB),
+    NumColors = ecaptcha_color:palette_size(Palette),
+    ColorsRGB = ecaptcha_color:palette_colors_by_frequency(Palette),
     PaletteLenBits = min_bits_to_fit(NumColors),
     % 2 ^ PaletteLenBits
     PaletteSize = 1 bsl PaletteLenBits,
@@ -89,16 +90,17 @@ image_descriptor(Width, Height) ->
 
 %% Body
 
-encode_raster_data(Pixels, IndexLookup, PaletteSize) ->
-    PalettePixels = map_to_palette(Pixels, IndexLookup),
+encode_raster_data(Pixels, Palette) ->
+    PaletteSize = ecaptcha_color:palette_size(Palette),
+    PalettePixels = map_to_palette(Pixels, Palette),
     CodeSize = max(min_bits_to_fit(PaletteSize), 2),
     Compressed = ecaptcha_gif_lzw:compress(PalettePixels, CodeSize),
     % LZW minimum code size
     [CodeSize | encode_chunks(Compressed)].
 
-map_to_palette(Pixels, IndexLookup) ->
+map_to_palette(Pixels, Palette) ->
     <<
-        <<(maps:get(Pixel, IndexLookup))>>
+        <<(ecaptcha_color:palette_get_index(Pixel, Palette))>>
         || <<Pixel>> <= Pixels
     >>.
 

@@ -20,12 +20,12 @@ encode(Pixels, Width, Height, Color) when byte_size(Pixels) =:= (Width * Height)
     %% we abuse the fact that color indexes in RGB and 8bit palette are the same, so we encode
     %% colors in "PLTE" section from RGB palette, but use 8bit palette for "IDAT" lookups, because
     %% `Pixels' are 8bit (greyscale).
-    {PaletteRGB, ColorLookup} = ecaptcha_color:map_palettes(Pixels, Color),
+    Palette = ecaptcha_color:new_palette(Pixels, Color),
     [
         Signature,
         chunk(<<"IHDR">>, mk_hdr(Width, Height)),
-        chunk(<<"PLTE">>, mk_palette(PaletteRGB)),
-        chunk(<<"IDAT">>, mk_data(Pixels, Width, ColorLookup)),
+        chunk(<<"PLTE">>, mk_palette(Palette)),
+        chunk(<<"IDAT">>, mk_data(Pixels, Width, Palette)),
         chunk(<<"IEND">>, <<>>)
     ].
 
@@ -42,17 +42,18 @@ mk_hdr(Width, Height) ->
     >>.
 
 mk_palette(Palette) ->
-    lists:map(fun ecaptcha_color:bin_3b/1, Palette).
+    ColorsRGB = ecaptcha_color:palette_colors_by_frequency(Palette),
+    lists:map(fun ecaptcha_color:bin_3b/1, ColorsRGB).
 
-mk_data(Pixels, Width, ColorLookup) ->
-    zlib:compress([mk_row(Row, ColorLookup) || <<Row:Width/binary>> <= Pixels]).
+mk_data(Pixels, Width, Palette) ->
+    zlib:compress([mk_row(Row, Palette) || <<Row:Width/binary>> <= Pixels]).
 
-mk_row(RowPixels, ColorLookup) ->
+mk_row(RowPixels, Palette) ->
     [
         % Filter type - None
         0,
         <<
-            <<(maps:get(Pixel, ColorLookup))>>
+            <<(ecaptcha_color:palette_get_index(Pixel, Palette))>>
             || <<Pixel>> <= RowPixels
         >>
     ].
