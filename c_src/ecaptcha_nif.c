@@ -140,9 +140,16 @@ static void filter(unsigned char im[AREA]) {
 
   memmove(im,om,sizeof(om));
 }
+enum {
+      OPT_LINE = 1,
+      OPT_DOTS = 1 << 1,
+      OPT_REVDOTS = 1 << 2,
+      OPT_FILTER = 1 << 3,
+      OPT_BLUR = 1 << 4
+};
 
 static void captcha(const unsigned char* rand, unsigned char im[AREA], const unsigned char* l,
-                    int length, int i_line, int i_blur, int i_filter, int i_dots, int i_revdots) {
+                    int length, int opts) {
   unsigned char swr[WIDTH];
   uint8_t s1,s2;
   uint32_t dr[NDOTS];
@@ -163,19 +170,19 @@ static void captcha(const unsigned char* rand, unsigned char im[AREA], const uns
     p=letter(l[x]-'a',p,im,swr,s1,s2);
   }
 
-  if (i_line == 1) {
+  if (opts & OPT_LINE) {
     line(im,swr,s1);
   }
-  if (i_dots == 1) {
+  if (opts & OPT_DOTS) {
     dots(im, dr);
   }
-  if (i_revdots == 1) {
+  if (opts & OPT_REVDOTS) {
     reverse_dots(im, dr);
   }
-  if (i_filter == 1) {
+  if (opts & OPT_FILTER) {
     filter(im);
   }
-  if (i_blur == 1) {
+  if (opts & OPT_BLUR) {
     blur(im);
   }
 }
@@ -208,7 +215,7 @@ mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     ERL_NIF_TERM opts_head, opts_tail, img_data_bin;
     ErlNifBinary chars_bin, rand_bin;
-    int i_line = 0, i_blur = 0, i_filter = 0, i_dots = 0, i_revdots = 0;
+    int opts = 0;
     char opt_name[15];
 
     unsigned char* img;
@@ -246,23 +253,22 @@ mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             return mk_error(env, "non_atom_option");
         }
         if (!strcmp(opt_name, "line")) {
-            i_line = 1;
+            opts |= OPT_LINE;
         } else if (!strcmp(opt_name, "blur")) {
-            i_blur = 1;
+            opts |= OPT_BLUR;
         } else if (!strcmp(opt_name, "filter")) {
-            i_filter = 1;
+            opts |= OPT_FILTER;
         } else if (!strcmp(opt_name, "dots")) {
-            i_dots = 1;
+            opts |= OPT_DOTS;
         } else if (!strcmp(opt_name, "reverse_dots")) {
-            i_revdots = 1;
+            opts |= OPT_REVDOTS;
         } else {
             return mk_error(env, "unknown_option");
         }
     }
     img = enif_make_new_binary(env, AREA, &img_data_bin);
 
-    captcha(rand_bin.data, img, chars_bin.data, chars_bin.size,
-            i_line, i_blur, i_filter, i_dots, i_revdots);
+    captcha(rand_bin.data, img, chars_bin.data, chars_bin.size, opts);
     return img_data_bin;
 }
 
