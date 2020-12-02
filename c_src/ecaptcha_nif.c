@@ -272,8 +272,14 @@ mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     return img_data_bin;
 }
 
+static int
+upgrade(ErlNifEnv* env, void** priv, void** old_priv, ERL_NIF_TERM info)
+{
+    return 0;
+}
+
 static ErlNifFunc nif_funcs[] = {
     {"pixels", 3, mk_pixels}
 };
 
-ERL_NIF_INIT(ecaptcha_nif, nif_funcs, NULL, NULL, NULL, NULL);
+ERL_NIF_INIT(ecaptcha_nif, nif_funcs, NULL, NULL, &upgrade, NULL);
