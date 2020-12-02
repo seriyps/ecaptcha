@@ -1,13 +1,16 @@
 // http://github.com/ITikhonov/captcha
-// https://github.com/huacnlee/rucaptcha
 #include <stdint.h>
 #include <string.h>
 #include "erl_nif.h"
 #include "font.h"
 
+#define WIDTH 200
+#define HIGH 70
+#define AREA WIDTH * HIGH
+
 static int8_t *lt[];
 
-static const int8_t sw[200]=
+static const int8_t sw[WIDTH]=
     {
      0, 4, 8, 12, 16, 20, 23, 27, 31, 35, 39, 43, 47, 50, 54, 58, 61, 65, 68, 71, 75, 78, 81, 84,
      87, 90, 93, 96, 98, 101, 103, 105, 108, 110, 112, 114, 115, 117, 119, 120, 121, 122, 123, 124,
@@ -24,10 +27,10 @@ static const int8_t sw[200]=
 
 #define MAX(x,y) ((x>y)?(x):(y))
 
-static int letter(unsigned char n, int pos, unsigned char im[70*200], unsigned char swr[200],
+static int letter(unsigned char n, int pos, unsigned char im[AREA], unsigned char swr[WIDTH],
                   uint8_t s1, uint8_t s2) {
   int8_t *p=lt[n];
-  unsigned char *r=im+200*16+pos;
+  unsigned char *r=im+WIDTH*16+pos;
   unsigned char *i=r;
   int sk1=s1+pos;
   int sk2=s2+pos;
@@ -35,78 +38,78 @@ static int letter(unsigned char n, int pos, unsigned char im[70*200], unsigned c
   int row=0;
   for(;*p!=-101;p++) {
     if(*p<0) {
-      if(*p==-100) { r+=200; i=r; sk1=s1+pos; row++; continue; }
+      if(*p==-100) { r+=WIDTH; i=r; sk1=s1+pos; row++; continue; }
       i+=-*p;
       continue;
     }
 
-    if(sk1>=200) sk1=sk1%200;
+    if(sk1>=WIDTH) sk1=sk1%WIDTH;
     int skew=sw[sk1]/16;
     sk1+=(swr[pos+i-r]&0x1)+1;
 
-    if(sk2>=200) sk2=sk2%200;
-    int skewh=sw[sk2]/70;
+    if(sk2>=WIDTH) sk2=sk2%WIDTH;
+    int skewh=sw[sk2]/HIGH;
     sk2+=(swr[row]&0x1);
 
-    unsigned char *x=i+skew*200+skewh;
+    unsigned char *x=i+skew*WIDTH+skewh;
     mpos=MAX(mpos,pos+i-r);
 
-    if((x-im)<70*200) *x=(*p)<<4;
+    if((x-im)<AREA) *x=(*p)<<4;
     i++;
   }
   return mpos + 3;
 }
 
-static void line(unsigned char im[70*200], unsigned char swr[200], uint8_t s1) {
+static void line(unsigned char im[AREA], unsigned char swr[WIDTH], uint8_t s1) {
   int x;
   int sk1=s1;
-  for(x=0;x<199;x++) {
-    if(sk1>=200) sk1=sk1%200;
+  for(x=0;x<WIDTH - 1;x++) {
+    if(sk1>=WIDTH) sk1=sk1%WIDTH;
     int skew=sw[sk1]/20;
     sk1+=swr[x]&(0x3+1);
-    unsigned char *i= im+(200*(45+skew)+x);
-    i[0]=0; i[1]=0; i[200]=0; i[201]=0;
+    unsigned char *i= im+(WIDTH*(45+skew)+x);
+    i[0]=0; i[1]=0; i[WIDTH]=0; i[WIDTH + 1]=0;
   }
 }
 
-#define NDOTS 200
+#define NDOTS 100
 
-static void dots(unsigned char im[70*200], uint32_t* dr) {
+static void dots(unsigned char im[AREA], uint32_t* dr) {
   int n;
-  for(n=0;n<NDOTS;n++) {
+  for(n = 0; n < NDOTS; n++) {
     uint32_t v=dr[n];
-    unsigned char *i=im+v%(200*67);
+    unsigned char *i=im+v%(WIDTH * (HIGH - 3));
 
     i[0]=0xff;
     i[1]=0xff;
     i[2]=0xff;
-    i[200]=0xff;
-    i[201]=0xff;
-    i[202]=0xff;
+    i[WIDTH]=0xff;
+    i[WIDTH + 1]=0xff;
+    i[WIDTH + 2]=0xff;
   }
 }
 
-static void blur(unsigned char im[70*200]) {
+static void blur(unsigned char im[AREA]) {
   unsigned char *i=im;
   int x,y;
-  for(y=0;y<68;y++) {
-    for(x=0;x<198;x++) {
-      unsigned int c11=*i,c12=i[1],c21=i[200],c22=i[201];
+  for(y=0;y<(HIGH - 2);y++) {
+      for(x=0;x<(WIDTH - 2);x++) {
+      unsigned int c11=*i,c12=i[1],c21=i[WIDTH],c22=i[WIDTH + 1];
       *i++=((c11+c12+c21+c22)/4);
     }
   }
 }
 
-static void filter(unsigned char im[70*200]) {
-  unsigned char om[70*200];
+static void filter(unsigned char im[AREA]) {
+  unsigned char om[AREA];
   unsigned char *i=im;
   unsigned char *o=om;
 
   memset(om,0xff,sizeof(om));
 
   int x,y;
-  for(y=0;y<70;y++) {
-    for(x=4;x<200-4;x++) {
+  for(y=0;y<HIGH;y++) {
+    for(x=4;x<WIDTH-4;x++) {
       if(i[0]>0xf0 && i[1]<0xf0) { o[0]=0; o[1]=0; }
       else if(i[0]<0xf0 && i[1]>0xf0) { o[0]=0; o[1]=0; }
 
@@ -118,17 +121,17 @@ static void filter(unsigned char im[70*200]) {
   memmove(im,om,sizeof(om));
 }
 
-static void captcha(const unsigned char* rand, unsigned char im[70*200], const unsigned char* l,
+static void captcha(const unsigned char* rand, unsigned char im[AREA], const unsigned char* l,
                     int length, int i_line, int i_blur, int i_filter, int i_dots) {
-  unsigned char swr[200];
+  unsigned char swr[WIDTH];
   uint8_t s1,s2;
   uint32_t dr[NDOTS];
 
-  memcpy(swr, rand, 200);
-  memcpy(dr, rand+=200, sizeof(dr));
+  memcpy(swr, rand, WIDTH);
+  memcpy(dr, rand+=WIDTH, sizeof(dr));
   memcpy(&s1, rand+=sizeof(dr), 1);
   memcpy(&s2, rand+=1, 1);
-  memset(im,0xff,200*70);
+  memset(im,0xff,AREA);
   s1=s1&0x7f;
   s2=s2&0x3f;
 
@@ -144,11 +147,11 @@ static void captcha(const unsigned char* rand, unsigned char im[70*200], const u
   if (i_dots == 1) {
     dots(im, dr);
   }
-  if (i_blur == 1) {
-    blur(im);
-  }
   if (i_filter == 1) {
     filter(im);
+  }
+  if (i_blur == 1) {
+    blur(im);
   }
 }
 
@@ -181,7 +184,7 @@ mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ERL_NIF_TERM opts_head, opts_tail, img_data_bin;
     ErlNifBinary chars_bin, rand_bin;
     int i_line = 0, i_blur = 0, i_filter = 0, i_dots = 0;
-    char opt_name[8];
+    char opt_name[15];
 
     unsigned char* img;
 
@@ -204,7 +207,7 @@ mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     if(!enif_inspect_binary(env, argv[1], &rand_bin)) {
         return mk_error(env, "bad_random");
     }
-    if(rand_bin.size < (200 + NDOTS * sizeof(uint32_t) + 2)) {
+    if(rand_bin.size < (WIDTH + NDOTS * sizeof(uint32_t) + 2)) {
         return mk_error(env, "small_rand_binary");
     }
 
@@ -229,7 +232,7 @@ mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             return mk_error(env, "unknown_option");
         }
     }
-    img = enif_make_new_binary(env, 70*200, &img_data_bin);
+    img = enif_make_new_binary(env, AREA, &img_data_bin);
 
     captcha(rand_bin.data, img, chars_bin.data, chars_bin.size, i_line, i_blur, i_filter, i_dots);
     return img_data_bin;
