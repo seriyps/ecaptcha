@@ -89,6 +89,26 @@ static void dots(unsigned char im[AREA], uint32_t* dr) {
   }
 }
 
+#define NREVDOTS 20
+#define MAX_DOT_SIZE 3
+
+static void reverse_dots(unsigned char im[AREA], uint32_t* dr) {
+  int n;
+  for(n=0;n<NREVDOTS;n++) {
+    uint32_t v=dr[n];
+    unsigned char *pos = im + v % (WIDTH * (HIGH - MAX_DOT_SIZE));
+    /* unsigned char size = (v / (WIDTH * (HIGH - MAX_DOT_SIZE))) % MAX_DOT_SIZE + 1; */
+    unsigned char size = (v >> 30) % MAX_DOT_SIZE + 1;
+    int x, y;
+
+    for(x=0; x<size; x++) {
+        for(y=0; y<size; y++) {
+            pos[WIDTH * x + y]=(0xff - pos[WIDTH * x + y]);
+        }
+    }
+  }
+}
+
 static void blur(unsigned char im[AREA]) {
   unsigned char *i=im;
   int x,y;
@@ -122,14 +142,16 @@ static void filter(unsigned char im[AREA]) {
 }
 
 static void captcha(const unsigned char* rand, unsigned char im[AREA], const unsigned char* l,
-                    int length, int i_line, int i_blur, int i_filter, int i_dots) {
+                    int length, int i_line, int i_blur, int i_filter, int i_dots, int i_revdots) {
   unsigned char swr[WIDTH];
   uint8_t s1,s2;
   uint32_t dr[NDOTS];
+  uint32_t rdr[NREVDOTS];
 
   memcpy(swr, rand, WIDTH);
   memcpy(dr, rand+=WIDTH, sizeof(dr));
-  memcpy(&s1, rand+=sizeof(dr), 1);
+  memcpy(dr, rand+=sizeof(dr), sizeof(rdr));
+  memcpy(&s1, rand+=sizeof(rdr), 1);
   memcpy(&s2, rand+=1, 1);
   memset(im,0xff,AREA);
   s1=s1&0x7f;
@@ -146,6 +168,9 @@ static void captcha(const unsigned char* rand, unsigned char im[AREA], const uns
   }
   if (i_dots == 1) {
     dots(im, dr);
+  }
+  if (i_revdots == 1) {
+    reverse_dots(im, dr);
   }
   if (i_filter == 1) {
     filter(im);
@@ -183,7 +208,7 @@ mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     ERL_NIF_TERM opts_head, opts_tail, img_data_bin;
     ErlNifBinary chars_bin, rand_bin;
-    int i_line = 0, i_blur = 0, i_filter = 0, i_dots = 0;
+    int i_line = 0, i_blur = 0, i_filter = 0, i_dots = 0, i_revdots = 0;
     char opt_name[15];
 
     unsigned char* img;
@@ -207,7 +232,7 @@ mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     if(!enif_inspect_binary(env, argv[1], &rand_bin)) {
         return mk_error(env, "bad_random");
     }
-    if(rand_bin.size < (WIDTH + NDOTS * sizeof(uint32_t) + 2)) {
+    if(rand_bin.size < (200 + (NDOTS + NREVDOTS) * sizeof(uint32_t) + 2)) {
         return mk_error(env, "small_rand_binary");
     }
 
@@ -228,13 +253,16 @@ mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             i_filter = 1;
         } else if (!strcmp(opt_name, "dots")) {
             i_dots = 1;
+        } else if (!strcmp(opt_name, "reverse_dots")) {
+            i_revdots = 1;
         } else {
             return mk_error(env, "unknown_option");
         }
     }
     img = enif_make_new_binary(env, AREA, &img_data_bin);
 
-    captcha(rand_bin.data, img, chars_bin.data, chars_bin.size, i_line, i_blur, i_filter, i_dots);
+    captcha(rand_bin.data, img, chars_bin.data, chars_bin.size,
+            i_line, i_blur, i_filter, i_dots, i_revdots);
     return img_data_bin;
 }
 

@@ -316,7 +316,14 @@ prop_map_histogram_consistent() ->
 %% Generator helpers
 
 opts_gen() ->
-    proper_types:list(proper_types:oneof([line, blur, filter, dots])).
+    proper_types:list(proper_types:oneof(
+                        [
+                         line,
+                         blur,
+                         filter,
+                         dots,
+                         reverse_dots
+                        ])).
 
 color_gen() ->
     proper_types:oneof([black, red, orange, blue, pink, purple]).
@@ -392,5 +399,7 @@ dump(Fmt, Params, Data) ->
     ok = file:write_file(Name, Data).
 
 dump(Fmt, Text, Opts, Color, Data) ->
-    OptsStr = lists:join(",", lists:map(fun erlang:atom_to_binary/1, lists:usort(Opts))),
-    dump(Fmt, [Text, OptsStr, Color], Data).
+    dump(Fmt, [Text, o2s(Opts), Color], Data).
+
+o2s(Opts) ->
+    lists:join(",", lists:map(fun erlang:atom_to_binary/1, lists:usort(Opts))).

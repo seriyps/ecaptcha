@@ -7,7 +7,7 @@
 -define(APPNAME, ecaptcha).
 -define(LIBNAME, ecaptcha).
 
--type opts() :: [line | blur | filter | dots].
+-type opts() :: [line | blur | filter | dots | reverse_dots].
 -type color_name() :: ecaptcha_color:color_name().
 -type color_rgb() :: ecaptcha_color:rgb().
 -type err_reason() ::

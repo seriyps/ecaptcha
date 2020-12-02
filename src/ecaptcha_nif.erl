@@ -9,8 +9,9 @@
 -define(APPNAME, ecaptcha).
 -define(LIBNAME, ecaptcha).
 
--define(NDOTS, 200).
--define(MIN_RAND, 200 + ?NDOTS * 4 + 2).
+-define(NDOTS, 100).
+-define(NREVDOTS, 20).
+-define(MIN_RAND, 200 + (?NDOTS + ?NREVDOTS) * 4 + 2).
 
 pixels(_Chars, _Rand, _Opts) ->
     not_loaded(?LINE).
