@@ -169,7 +169,7 @@ enum {
 static void captcha(const unsigned char* rand, unsigned char im[AREA], const unsigned char* l,
                     int length, int opts) {
   unsigned char swr[WIDTH];
-  uint8_t s1,s2;
+  uint8_t s1,s2,s3;
   uint32_t dr[NDOTS];
   uint32_t rdr[NREVDOTS];
 
@@ -178,12 +178,13 @@ static void captcha(const unsigned char* rand, unsigned char im[AREA], const uns
   memcpy(rdr, rand+=sizeof(dr), sizeof(rdr));
   memcpy(&s1, rand+=sizeof(rdr), 1);
   memcpy(&s2, rand+=1, 1);
+  memcpy(&s3, rand+=1, 1);
   memset(im,0xff,AREA);
   s1=s1&0x7f;
   s2=s2&0x3f;
 
   int x;
-  int p=30;
+  int p=5 + s3 % 25;
   for(x=0;x<length;x++){
     p=letter(l[x]-'a',p,im,swr,s1,s2);
   }

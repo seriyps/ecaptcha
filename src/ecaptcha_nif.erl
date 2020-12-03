@@ -11,7 +11,7 @@
 
 -define(NDOTS, 100).
 -define(NREVDOTS, 20).
--define(MIN_RAND, 200 + (?NDOTS + ?NREVDOTS) * 4 + 2).
+-define(MIN_RAND, 200 + (?NDOTS + ?NREVDOTS) * 4 + 3).
 
 pixels(_Chars, _Rand, _Opts) ->
     not_loaded(?LINE).
