@@ -7,8 +7,18 @@
 #include "font.h"
 
 #define WIDTH 200
-#define HIGH 70
-#define AREA WIDTH * HIGH
+#define HIGHT 70
+#define AREA WIDTH * HIGHT
+
+#define NDOTS 100
+
+#define NREVDOTS 20
+#define MAX_REVDOT_SIZE 3
+
+
+#define AT(_im, _x, _y) (_im[(_y) * WIDTH + (_x)])
+#define MAX(x,y) ((x>y)?(x):(y))
+#define VISIBLE(V) (V < 0xf0)
 
 static int8_t *lt[];
 
@@ -26,8 +36,6 @@ static const int8_t sw[WIDTH]=
      -96, -93, -90, -87, -84, -81, -78, -75, -71, -68, -65, -61, -58, -54, -50, -47, -43, -39, -35,
      -31, -27, -23, -20, -16, -12, -8, -4};
 
-
-#define MAX(x,y) ((x>y)?(x):(y))
 
 static int letter(unsigned char n, int pos, unsigned char im[AREA], unsigned char swr[WIDTH],
                   uint8_t s1, uint8_t s2) {
@@ -50,7 +58,7 @@ static int letter(unsigned char n, int pos, unsigned char im[AREA], unsigned cha
     sk1+=(swr[pos+i-r]&0x1)+1;
 
     if(sk2>=WIDTH) sk2=sk2%WIDTH;
-    int skewh=sw[sk2]/HIGH;
+    int skewh=sw[sk2]/HIGHT;
     sk2+=(swr[row]&0x1);
 
     unsigned char *x=i+skew*WIDTH+skewh;
@@ -70,42 +78,39 @@ static void line(unsigned char im[AREA], unsigned char swr[WIDTH], uint8_t s1) {
     int skew=sw[sk1]/20;
     sk1+=swr[x]&(0x3+1);
     unsigned char *i= im+(WIDTH*(45+skew)+x);
-    i[0]=0; i[1]=0; i[WIDTH]=0; i[WIDTH + 1]=0;
+    AT(i, 0, 0)=0;
+    AT(i, 1, 0)=0;
+    AT(i, 0, 1)=0;
+    AT(i, 1, 1)=0;
   }
 }
-
-#define NDOTS 100
 
 static void dots(unsigned char im[AREA], uint32_t* dr) {
   int n;
   for(n = 0; n < NDOTS; n++) {
     uint32_t v=dr[n];
-    unsigned char *i=im+v%(WIDTH * (HIGH - 3));
-
-    i[0]=0xff;
-    i[1]=0xff;
-    i[2]=0xff;
-    i[WIDTH]=0xff;
-    i[WIDTH + 1]=0xff;
-    i[WIDTH + 2]=0xff;
+    unsigned char *pos=im+v%(WIDTH * (HIGHT - 3));
+    int x, y;
+    // 3x3 box with top-left corner at `pos`
+    for(y=0; y<3; y++) {
+        for(x=0; x<3; x++) {
+            AT(pos, x, y)=0xff;
+        }
+    }
   }
 }
-
-#define NREVDOTS 20
-#define MAX_DOT_SIZE 3
 
 static void reverse_dots(unsigned char im[AREA], uint32_t* dr) {
   int n;
   for(n=0;n<NREVDOTS;n++) {
     uint32_t v=dr[n];
-    unsigned char *pos = im + v % (WIDTH * (HIGH - MAX_DOT_SIZE));
-    /* unsigned char size = (v / (WIDTH * (HIGH - MAX_DOT_SIZE))) % MAX_DOT_SIZE + 1; */
-    unsigned char size = (v >> 30) % MAX_DOT_SIZE + 1;
+    unsigned char *pos = im + v % (WIDTH * (HIGHT - MAX_REVDOT_SIZE));
+    unsigned char size = (v >> 30) % MAX_REVDOT_SIZE + 1;
     int x, y;
-
-    for(x=0; x<size; x++) {
-        for(y=0; y<size; y++) {
-            pos[WIDTH * x + y]=(0xff - pos[WIDTH * x + y]);
+    // box of `size` with top-left corner at `pos`
+    for(y=0; y<size; y++) {
+        for(x=0; x<size; x++) {
+            AT(pos, x, y)=(0xff - AT(pos, x, y));
         }
     }
   }
@@ -114,30 +119,35 @@ static void reverse_dots(unsigned char im[AREA], uint32_t* dr) {
 static void blur(unsigned char im[AREA]) {
   unsigned char *i=im;
   int x,y;
-  for(y=0;y<(HIGH - 2);y++) {
+  for(y=0;y<(HIGHT - 2);y++) {
       for(x=0;x<(WIDTH - 2);x++) {
-      unsigned int c11=*i,c12=i[1],c21=i[WIDTH],c22=i[WIDTH + 1];
+          unsigned int
+              c11=AT(i, 0, 0),
+              c12=AT(i, 1, 0),
+              c21=AT(i, 0, 1),
+              c22=AT(i, 1, 1);
       *i++=((c11+c12+c21+c22)/4);
     }
   }
 }
 
-#define VISIBLE(V) (V < 0xf0)
-
 static void filter(unsigned char im[AREA]) {
   unsigned char om[AREA];
-  unsigned char *i=im + WIDTH;
-  unsigned char *o=om + WIDTH;
+  unsigned char *i=&AT(im, 0, 1);
+  unsigned char *o=&AT(om, 0, 1);
 
   memset(om,0xff,sizeof(om));
 
-  while (i < (im + AREA - WIDTH)) {
+  while (i < &AT(im, WIDTH, HIGHT - 1)) {
       // ??B??
       // ?BiB?
       // ??B??
-      if (VISIBLE(i[0]) && (VISIBLE(i[-1]) && VISIBLE(i[1]) &&
-                            VISIBLE(i[0 - WIDTH]) && VISIBLE(i[WIDTH]))) {
-      } else {
+      if (!(VISIBLE(AT(i, 0, 0)) &&
+            VISIBLE(AT(i, -1, 0)) && // left
+            VISIBLE(AT(i, 1, 0)) && // right
+            VISIBLE(AT(i, 0, -1)) && // above
+            VISIBLE(AT(i, 0, 1))) // below
+          ) {
           o[0] = i[0];
       }
 
@@ -283,7 +293,7 @@ mk_pixels(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 static int
 upgrade(ErlNifEnv* env, void** priv, void** old_priv, ERL_NIF_TERM info)
 {
-    return 0;
+    return 0; // NIF is stateless
 }
 
 static ErlNifFunc nif_funcs[] = {
