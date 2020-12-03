@@ -165,7 +165,7 @@ static void captcha(const unsigned char* rand, unsigned char im[AREA], const uns
 
   memcpy(swr, rand, WIDTH);
   memcpy(dr, rand+=WIDTH, sizeof(dr));
-  memcpy(dr, rand+=sizeof(dr), sizeof(rdr));
+  memcpy(rdr, rand+=sizeof(dr), sizeof(rdr));
   memcpy(&s1, rand+=sizeof(rdr), 1);
   memcpy(&s2, rand+=1, 1);
   memset(im,0xff,AREA);
