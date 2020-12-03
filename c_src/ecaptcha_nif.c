@@ -1,4 +1,6 @@
-// http://github.com/ITikhonov/captcha
+// Imported from http://github.com/ITikhonov/captcha and updated
+// by Sergey Prokhorov <me@seriyps.ru>
+
 #include <stdint.h>
 #include <string.h>
 #include "erl_nif.h"
