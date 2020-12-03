@@ -120,26 +120,32 @@ static void blur(unsigned char im[AREA]) {
   }
 }
 
+#define VISIBLE(V) (V < 0xf0)
+
 static void filter(unsigned char im[AREA]) {
   unsigned char om[AREA];
-  unsigned char *i=im;
-  unsigned char *o=om;
+  unsigned char *i=im + WIDTH;
+  unsigned char *o=om + WIDTH;
 
   memset(om,0xff,sizeof(om));
 
-  int x,y;
-  for(y=0;y<HIGH;y++) {
-    for(x=4;x<WIDTH-4;x++) {
-      if(i[0]>0xf0 && i[1]<0xf0) { o[0]=0; o[1]=0; }
-      else if(i[0]<0xf0 && i[1]>0xf0) { o[0]=0; o[1]=0; }
+  while (i < (im + AREA - WIDTH)) {
+      // ??B??
+      // ?BiB?
+      // ??B??
+      if (VISIBLE(i[0]) && (VISIBLE(i[-1]) && VISIBLE(i[1]) &&
+                            VISIBLE(i[0 - WIDTH]) && VISIBLE(i[WIDTH]))) {
+      } else {
+          o[0] = i[0];
+      }
 
       i++;
       o++;
-    }
   }
 
   memmove(im,om,sizeof(om));
 }
+
 enum {
       OPT_LINE = 1,
       OPT_DOTS = 1 << 1,
