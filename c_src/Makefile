@@ -46,6 +46,7 @@ cpp_verbose = $(cpp_verbose_$(V))
 link_verbose_0 = @echo " LD    " $(@F);
 link_verbose = $(link_verbose_$(V))
 
+C_FILES := $(shell find $(C_SRC_DIR) -type f -name "*.c")
 SOURCES := $(shell find $(C_SRC_DIR) -type f \( -name "*_nif.c" \))
 OBJECTS = $(addsuffix .o, $(basename $(SOURCES)))
 
@@ -60,6 +61,9 @@ $(C_SRC_OUTPUT): font.h $(OBJECTS)
 
 unfont: unfont.c
 	$(c_verbose) $(CC) $(CFLAGS) $(OUTPUT_OPTION) $<
+
+format:
+	clang-format --style=LLVM -i $(C_FILES)
 
 font.h: unfont
 	./unfont > .font.h
