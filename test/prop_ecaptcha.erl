@@ -154,18 +154,21 @@ prop_gif_gradient_identify() ->
                 false ->
                     Res = identify(Iodata),
                     ?WHENFAIL(
-                       begin
-                           dump("err_~wx~w_ncolors~w_color~p.gif", [X, Y, NColors, Color], Iodata),
-                           io:format(
-                             "In: ~p~nRes: ~120p~n",
-                             [{X, Y, NColors}, Res])
-                       end,
-                       proper:conjunction(
-                         [{code_normal, normal == maps:get(code, Res)},
-                          {no_io_err, [] == maps:get(err, Res, [])},
-                          {no_stderr, [] == maps:get(stderr, Res, [])}]
+                        begin
+                            dump("err_~wx~w_ncolors~w_color~p.gif", [X, Y, NColors, Color], Iodata),
+                            io:format(
+                                "In: ~p~nRes: ~120p~n",
+                                [{X, Y, NColors}, Res]
+                            )
+                        end,
+                        proper:conjunction(
+                            [
+                                {code_normal, normal == maps:get(code, Res)},
+                                {no_io_err, [] == maps:get(err, Res, [])},
+                                {no_stderr, [] == maps:get(stderr, Res, [])}
+                            ]
                         )
-                      )
+                    )
             end
         end
     ).
@@ -293,37 +296,44 @@ prop_png_gradient_identify() ->
                     "In: ~p~nPixels: ~120p~nRes: ~120p~n",
                     [{X, Y, NColors}, Pixels, Res]
                 ),
-               proper:conjunction(
-                 [{code_normal, normal == maps:get(code, Res)},
-                  {no_io_err, [] == maps:get(err, Res, [])}]
-                 )
+                proper:conjunction(
+                    [
+                        {code_normal, normal == maps:get(code, Res)},
+                        {no_io_err, [] == maps:get(err, Res, [])}
+                    ]
+                )
             )
         end
     ).
 
 prop_map_histogram_consistent() ->
     ?FORALL(
-       {Pixels, Color},
-       {proper_types:non_empty(proper_types:binary()), rgb_gen()},
-       begin
-           Histogram8b = ecaptcha_color:histogram_from_8b_pixels(Pixels),
-           Mapping = ecaptcha_color:histogram_map_channel_to_rgb(Histogram8b, Color),
-           ?WHENFAIL(
-              io:format("Hist8b:~p~nMapping:~p~n", [Histogram8b, Mapping]),
-              map_size(Histogram8b) == length(Mapping))
-       end).
+        {Pixels, Color},
+        {proper_types:non_empty(proper_types:binary()), rgb_gen()},
+        begin
+            Histogram8b = ecaptcha_color:histogram_from_8b_pixels(Pixels),
+            Mapping = ecaptcha_color:histogram_map_channel_to_rgb(Histogram8b, Color),
+            ?WHENFAIL(
+                io:format("Hist8b:~p~nMapping:~p~n", [Histogram8b, Mapping]),
+                map_size(Histogram8b) == length(Mapping)
+            )
+        end
+    ).
 
 %% Generator helpers
 
 opts_gen() ->
-    proper_types:list(proper_types:oneof(
-                        [
-                         line,
-                         blur,
-                         filter,
-                         dots,
-                         reverse_dots
-                        ])).
+    proper_types:list(
+        proper_types:oneof(
+            [
+                line,
+                blur,
+                filter,
+                dots,
+                reverse_dots
+            ]
+        )
+    ).
 
 color_gen() ->
     proper_types:oneof([black, red, orange, blue, pink, purple]).
@@ -365,15 +375,16 @@ exec(Cmd, Args, Input) ->
     FullCmd = Cmd ++ lists:flatten([[" " | A] || A <- Args]),
     {ok, Pid, OsPid} = exec:run(FullCmd, [stdin, stdout, stderr, monitor]),
     Res0 =
-    try
-        ok = send_chunks(Pid, iolist_to_binary(Input)),
-        %% ok = exec:send(Pid, iolist_to_binary(Input)),
-        ok = exec:send(Pid, eof),
-        #{}
-    catch T:R:S ->
-            exec:start([]),
-            #{err => {T, R, S}}
-    end,
+        try
+            ok = send_chunks(Pid, iolist_to_binary(Input)),
+            %% ok = exec:send(Pid, iolist_to_binary(Input)),
+            ok = exec:send(Pid, eof),
+            #{}
+        catch
+            T:R:S ->
+                exec:start([]),
+                #{err => {T, R, S}}
+        end,
     recv(OsPid, Res0).
 
 send_chunks(Pid, <<Chunk:2048/binary, Tail/binary>>) ->
@@ -381,7 +392,6 @@ send_chunks(Pid, <<Chunk:2048/binary, Tail/binary>>) ->
     send_chunks(Pid, Tail);
 send_chunks(Pid, Tail) ->
     exec:send(Pid, Tail).
-
 
 recv(OsPid, Acc) ->
     receive

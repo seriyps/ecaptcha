@@ -78,20 +78,27 @@ new_palette(Pixels, Color) ->
     %% 1. List of RGB colors sorted by frequency {freq_index(), rgb()}
     %% 2. Mapping from greyscale to freq_index() (can have duplicates)
     Histogram8bit = histogram_from_8b_pixels(Pixels),
-    Mapping = histogram_map_channel_to_rgb(Histogram8bit, Color), % [{rgb(), channel(), freq()}]
+    % [{rgb(), channel(), freq()}]
+    Mapping = histogram_map_channel_to_rgb(Histogram8bit, Color),
     %% one channel() can map to more than one rgb()
     ChannelToRGB = maps:from_list([{Ch, RGB} || {RGB, Ch, _} <- Mapping]),
     %% RGBHistogram can be smaller than ChannelToRGB
-    RGBHistogram = lists:foldl(fun({RGB, _, Freq}, Acc) ->
-                                       Freq0 = maps:get(RGB, Acc, 0),
-                                       Acc#{RGB => Freq0 + Freq}
-                               end, #{}, Mapping),
+    RGBHistogram = lists:foldl(
+        fun({RGB, _, Freq}, Acc) ->
+            Freq0 = maps:get(RGB, Acc, 0),
+            Acc#{RGB => Freq0 + Freq}
+        end,
+        #{},
+        Mapping
+    ),
     %% [{rgb(), freq_index()}], sorted by freq_index()
     RGBByFreq = indexed_from_histogram(RGBHistogram),
     FreqIndexByRGB = maps:from_list(RGBByFreq),
     ChannelToIndex = maps:map(fun(_Ch, RGB) -> maps:get(RGB, FreqIndexByRGB) end, ChannelToRGB),
-    #palette{colors = [RGB || {RGB, _Idx} <- RGBByFreq],
-             lookup_tab = ChannelToIndex}.
+    #palette{
+        colors = [RGB || {RGB, _Idx} <- RGBByFreq],
+        lookup_tab = ChannelToIndex
+    }.
 
 indexed_from_histogram(Histogram) ->
     Sorted = hist_sort_by_frequency(Histogram),
@@ -131,7 +138,7 @@ histogram_from_8b_pixels(<<Pixel, Pixels/binary>>, Hist) ->
 %% This is to, kind of, use colors from greyscale as a "saturation" value for RGB color.
 %% Or, to convert a greyscale image to a single-color-tone image.
 -spec histogram_map_channel_to_rgb(histogram(channel()), rgb()) ->
-          [{rgb(), channel(), Freq :: pos_integer()}].
+    [{rgb(), channel(), Freq :: pos_integer()}].
 histogram_map_channel_to_rgb(Histogram8b, RGB) ->
     {Pixels, Frequences} = lists:unzip(maps:to_list(Histogram8b)),
     lists:zip3(palette_map_channel_to_rgb(Pixels, RGB), Pixels, Frequences).

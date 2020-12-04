@@ -21,8 +21,10 @@
         clear => 0..4096,
         eoi => 0..4096
     },
-    bits_per_code :: 2..12, %?MAX_BITS_PER_CODE,
-    start_bits_per_code :: 2..12 %?MAX_BITS_PER_CODE
+    %?MAX_BITS_PER_CODE,
+    bits_per_code :: 2..12,
+    %?MAX_BITS_PER_CODE
+    start_bits_per_code :: 2..12
 }).
 
 -record(acc, {
