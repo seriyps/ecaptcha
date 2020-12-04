@@ -21,8 +21,8 @@
         clear => 0..4096,
         eoi => 0..4096
     },
-    bits_per_code :: 2..?MAX_BITS_PER_CODE,
-    start_bits_per_code :: 2..?MAX_BITS_PER_CODE
+    bits_per_code :: 2..12, %?MAX_BITS_PER_CODE,
+    start_bits_per_code :: 2..12 %?MAX_BITS_PER_CODE
 }).
 
 -record(acc, {
@@ -31,7 +31,7 @@
     acc_bits :: 0..7
 }).
 
--spec compress(binary(), 2..?MAX_BITS_PER_CODE) -> binary().
+-spec compress(binary(), 2..12) -> binary().
 compress(Data, InitBitsPerCode) ->
     ClearDictionary = 1 bsl InitBitsPerCode,
     EndOfInformation = ClearDictionary + 1,
