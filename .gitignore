@@ -18,6 +18,6 @@ _build
 *.iml
 rebar3.crashdump
 *~
-c_src/unfont
+c_src/mk_font
 erlang_ls.config
 doc/

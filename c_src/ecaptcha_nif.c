@@ -2,13 +2,14 @@
 // by Sergey Prokhorov <me@seriyps.ru>
 
 #include "erl_nif.h"
-#include "font.h"
+#include "fonts.h"
 #include <stdint.h>
 #include <string.h>
 
 #define WIDTH 200
 #define HIGHT 70
 #define AREA WIDTH *HIGHT
+#define MAX_CHARS 7
 
 #define NDOTS 100
 
@@ -18,8 +19,6 @@
 #define AT(_im, _x, _y) (_im[(_y)*WIDTH + (_x)])
 #define MAX(x, y) ((x > y) ? (x) : (y))
 #define VISIBLE(V) (V < 0xf0)
-
-static int8_t *lt[];
 
 static const int8_t sw[WIDTH] = {
     0,    4,    8,    12,   16,   20,   23,   27,   31,   35,   39,   43,
@@ -40,25 +39,24 @@ static const int8_t sw[WIDTH] = {
     -75,  -71,  -68,  -65,  -61,  -58,  -54,  -50,  -47,  -43,  -39,  -35,
     -31,  -27,  -23,  -20,  -16,  -12,  -8,   -4};
 
-static int letter(unsigned char n, int pos, unsigned char im[AREA],
+static int letter(Glyph glyph, int pos, unsigned char im[AREA],
                   unsigned char swr[WIDTH], uint8_t s1, uint8_t s2) {
-  int8_t *p = lt[n];
   unsigned char *r = im + WIDTH * 16 + pos;
   unsigned char *i = r;
   int sk1 = s1 + pos;
   int sk2 = s2 + pos;
   int mpos = pos;
   int row = 0;
-  for (; *p != -101; p++) {
-    if (*p < 0) {
-      if (*p == -100) {
+  for (; *glyph != BC_EOG; glyph++) {
+    if (*glyph < 0) {
+      if (*glyph == BC_NEWLINE) {
         r += WIDTH;
         i = r;
         sk1 = s1 + pos;
         row++;
         continue;
       }
-      i += -*p;
+      i += -*glyph;
       continue;
     }
 
@@ -76,7 +74,7 @@ static int letter(unsigned char n, int pos, unsigned char im[AREA],
     mpos = MAX(mpos, pos + i - r);
 
     if ((x - im) < AREA)
-      *x = (*p) << 4;
+      *x = (*glyph) * 2;
     i++;
   }
   return mpos + 3;
@@ -175,8 +173,8 @@ enum {
   OPT_BLUR = 1 << 4
 };
 
-static void captcha(const unsigned char *rand, unsigned char im[AREA],
-                    const unsigned char *l, int length, int opts) {
+static void captcha(Glyph glyphs[], int length, const unsigned char *rand,
+                    unsigned char im[AREA], int opts) {
   unsigned char swr[WIDTH];
   uint8_t s1, s2, s3;
   uint32_t dr[NDOTS];
@@ -195,7 +193,7 @@ static void captcha(const unsigned char *rand, unsigned char im[AREA],
   int x;
   int p = 5 + s3 % 25;
   for (x = 0; x < length; x++) {
-    p = letter(l[x] - 'a', p, im, swr, s1, s2);
+    p = letter(glyphs[x], p, im, swr, s1, s2);
   }
 
   if (opts & OPT_LINE) {
@@ -234,40 +232,62 @@ static ERL_NIF_TERM mk_error(ErlNifEnv *env, const char *mesg) {
 static ERL_NIF_TERM mk_pixels(ErlNifEnv *env, int argc,
                               const ERL_NIF_TERM argv[]) {
   ERL_NIF_TERM opts_head, opts_tail, img_data_bin;
-  ErlNifBinary chars_bin, rand_bin;
+  ErlNifBinary font_name_bin, chars_bin, rand_bin;
+  Font *font = NULL;
+  Font **fs;
+  char *alphabet_idx;
+  Glyph glyphs[MAX_CHARS];
   int opts = 0;
   char opt_name[15];
 
   unsigned char *img;
 
-  if (argc != 3) {
+  if (argc != 4) {
     return enif_make_badarg(env);
   }
 
-  if (!enif_inspect_binary(env, argv[0], &chars_bin)) {
+  if (!enif_inspect_binary(env, argv[0], &font_name_bin)) {
+    return mk_error(env, "font_name_not_binary");
+  }
+  for (fs = fonts; *fs != NULL; fs++) {
+    if (strncmp((*fs)->name, (char *)font_name_bin.data, font_name_bin.size) ==
+        0) {
+      font = *fs;
+      break;
+    }
+  }
+  if (!font) {
+    return mk_error(env, "font_not_found");
+  }
+
+  if (!enif_inspect_binary(env, argv[1], &chars_bin)) {
     return mk_error(env, "chars_not_binary");
   }
-  if (chars_bin.size < 1 || chars_bin.size > 7) {
+  if (chars_bin.size < 1 || chars_bin.size > MAX_CHARS) {
     return mk_error(env, "wrong_chars_length");
   }
   for (int i = 0; i < chars_bin.size; i++) {
-    if (chars_bin.data[i] > 'z' || chars_bin.data[i] < 'a') {
-      return mk_error(env, "invalid_character");
+    /* assert all characters are in the alphabet; lookup glyphs and pass array
+     * of glyphs */
+    alphabet_idx = strchr(font->alphabet, chars_bin.data[i]);
+    if (!alphabet_idx) {
+      return mk_error(env, "character_out_of_alphabet_range");
     }
+    glyphs[i] = (Glyph)font->glyphs[alphabet_idx - font->alphabet];
   }
 
-  if (!enif_inspect_binary(env, argv[1], &rand_bin)) {
+  if (!enif_inspect_binary(env, argv[2], &rand_bin)) {
     return mk_error(env, "bad_random");
   }
   if (rand_bin.size < (200 + (NDOTS + NREVDOTS) * sizeof(uint32_t) + 2)) {
     return mk_error(env, "small_rand_binary");
   }
 
-  if (!enif_is_list(env, argv[2])) {
+  if (!enif_is_list(env, argv[3])) {
     return mk_error(env, "opts_not_list");
   }
 
-  opts_tail = argv[2];
+  opts_tail = argv[3];
   while (enif_get_list_cell(env, opts_tail, &opts_head, &opts_tail)) {
     if (!enif_get_atom(env, opts_head, opt_name, sizeof(opt_name),
                        ERL_NIF_LATIN1)) {
@@ -289,7 +309,7 @@ static ERL_NIF_TERM mk_pixels(ErlNifEnv *env, int argc,
   }
   img = enif_make_new_binary(env, AREA, &img_data_bin);
 
-  captcha(rand_bin.data, img, chars_bin.data, chars_bin.size, opts);
+  captcha(glyphs, chars_bin.size, rand_bin.data, img, opts);
   return img_data_bin;
 }
 
@@ -298,6 +318,6 @@ static int upgrade(ErlNifEnv *env, void **priv, void **old_priv,
   return 0; // NIF is stateless
 }
 
-static ErlNifFunc nif_funcs[] = {{"pixels", 3, mk_pixels}};
+static ErlNifFunc nif_funcs[] = {{"pixels", 4, mk_pixels}};
 
 ERL_NIF_INIT(ecaptcha_nif, nif_funcs, NULL, NULL, &upgrade, NULL);
