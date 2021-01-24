@@ -1,7 +1,7 @@
 %% @doc Main interface for Erlang captcha library
 -module(ecaptcha).
 
--export([pixels/2, gif/2, png/2]).
+-export([pixels/2, gif/2, png/2, fonts/0]).
 
 -export_type([opts/0, effects/0, color_name/0, color_rgb/0, font_name/0, alphabet/0, err_reason/0]).
 
@@ -32,7 +32,8 @@
 -type color_name() :: ecaptcha_color:color_name().
 -type color_rgb() :: ecaptcha_color:rgb().
 -type font_name() :: binary().
--type alphabet() :: numbers | latin_lowercase | latin_uppercase | binary().
+-type alphabet() :: numbers | latin_lowercase | latin_uppercase | alphabet_bin().
+-type alphabet_bin() :: binary().
 -type err_reason() ::
     font_name_not_binary
     | font_not_found
@@ -90,6 +91,15 @@ gif(NumChars, Opts) ->
     | {error, err_reason()}.
 png(NumChars, Opts) ->
     img(NumChars, Opts, fun ecaptcha_png:encode/4).
+
+%% @doc List avaliable fonts
+%%
+%% Returns a list of tuples where the 1st element is the font name and 2nd elemnt is the binary
+%% containing all the available characters of this font.
+%% Format may change in the future.
+-spec fonts() -> [{font_name(), alphabet_bin()}, ...].
+fonts() ->
+    ecaptcha_nif:fonts().
 
 %% Internal
 

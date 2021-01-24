@@ -1,7 +1,7 @@
 %% @private
 -module(ecaptcha_nif).
 
--export([pixels/4]).
+-export([pixels/4, fonts/0]).
 -export([rand_size/0]).
 
 -on_load(init/0).
@@ -14,6 +14,9 @@
 -define(MIN_RAND, 200 + (?NDOTS + ?NREVDOTS) * 4 + 3).
 
 pixels(_Font, _Chars, _Rand, _Effects) ->
+    not_loaded(?LINE).
+
+fonts() ->
     not_loaded(?LINE).
 
 rand_size() ->

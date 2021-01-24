@@ -22,8 +22,14 @@ Add `ecaptcha` as a dependency to your project's rebar.config:
 
 Then use one of the API functions to generate the image and short random text:
 
-```
-{Phrase, PNGImage} = ecaptcha:png(5, #{effects => [line, blur, filter, dots, reverse_dots], color => black}).
+```erlang
+{Phrase, PNGImage} = ecaptcha:png(
+    5,
+    #{effects => [line, blur, filter, dots, reverse_dots],
+      color => black,
+      alphabet => latin_uppercase,
+      font => <<"dejavusans">>}
+).
 ```
 
 `PNGImage` can be sent to the user with `Content-Type: image/png` and user have to guess
@@ -51,9 +57,9 @@ your website / app style. You can select from a set of predefined colors: `black
 predefined sets: `numbers` for 0-9, `latin_lowercase` for a-z, `latin_uppercase` for A-Z or it
 can be a binary containing all the allowed characters (duplicates are ok), eg `<<"1234abcd">>`.
 
-`font` binary name of one of the supported fonts. Fonts are pre-rendered at NIF compile-time, see
-the `c_src/fonts.h` and `FONTS` parameter in `c_src/Makefile`. By default it's one of
-`<<"hplhs-oldstyle">>`, `<<"ubuntu-r">>` or `<<"dejavusans">>`.
+`font` binary name of one of the supported fonts. Function `fonts/0` can be used to get the list of
+available fonts. Fonts are pre-rendered at NIF compile-time, see the `c_src/fonts.h` and
+`FONTS` parameter in `c_src/Makefile`.
 
 All the options are optional.
 
@@ -70,6 +76,14 @@ Same as `ecaptcha:png/2`, but returns the image encoded in GIF format. `Content-
 pixels, from top-left to bottom-right, line-by-line. It can be used to, eg, display pixels with
 JavaScript on a `<canvas>` etc. Options are the same as for `gif/2` or `png/2`, but `color` key
 is obviously ignored.
+
+```erlang
+ecaptcha:fonts()
+```
+
+Returns a list of tuples containing information about each available font. Currently it's a 2-tuple
+where 1st element is binary font name and 2nd element is binary containing all the characters of
+the alphabet available for this font.
 
 Image encoders
 --------------

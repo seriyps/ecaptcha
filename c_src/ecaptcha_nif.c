@@ -313,11 +313,38 @@ static ERL_NIF_TERM mk_pixels(ErlNifEnv *env, int argc,
   return img_data_bin;
 }
 
+/* [{<<"name">>, <<"alphabet">>}, ..] */
+static ERL_NIF_TERM list_fonts(ErlNifEnv *env, int argc,
+                               const ERL_NIF_TERM argv[]) {
+  Font **fs;
+  ERL_NIF_TERM res, row, name, alphabet;
+  unsigned char *strp;
+  size_t slen;
+  res = enif_make_list(env, 0);
+
+  for (fs = fonts; *fs != NULL; fs++) {
+    /* copy font name */
+    slen = strlen((*fs)->name);
+    strp = enif_make_new_binary(env, slen, &name);
+    memcpy(strp, (*fs)->name, slen);
+    /* copy font alphabet */
+    slen = strlen((*fs)->alphabet);
+    strp = enif_make_new_binary(env, slen, &alphabet);
+    memcpy(strp, (*fs)->alphabet, slen);
+    /* {name, alphabet} */
+    row = enif_make_tuple2(env, name, alphabet);
+    /* [{name, alphabet} | res] */
+    res = enif_make_list_cell(env, row, res);
+  }
+  return res;
+}
+
 static int upgrade(ErlNifEnv *env, void **priv, void **old_priv,
                    ERL_NIF_TERM info) {
   return 0; // NIF is stateless
 }
 
-static ErlNifFunc nif_funcs[] = {{"pixels", 4, mk_pixels}};
+static ErlNifFunc nif_funcs[] = {{"pixels", 4, mk_pixels},
+                                 {"fonts", 0, list_fonts}};
 
 ERL_NIF_INIT(ecaptcha_nif, nif_funcs, NULL, NULL, &upgrade, NULL);

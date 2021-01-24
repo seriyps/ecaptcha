@@ -404,7 +404,7 @@ rgb_gen() ->
     {proper_types:range(0, 255), proper_types:range(0, 255), proper_types:range(0, 255)}.
 
 font_gen() ->
-    proper_types:oneof([<<"hplhs-oldstyle">>, <<"ubuntu-r">>, <<"dejavusans">>]).
+    proper_types:oneof([Name || {Name, _Alphabet} <- ecaptcha:fonts()]).
 
 alpha_gen(Min, Max) ->
     binary_gen(lists:seq($a, $z), Min, Max).
