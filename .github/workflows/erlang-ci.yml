@@ -1,0 +1,47 @@
+name: Test pipeline
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  build:
+
+    strategy:
+      matrix:
+        platform: [ubuntu-latest]
+        otp-version: [21.3, 22.3, 23.2]
+
+    runs-on: ${{ matrix.platform }}
+
+    container:
+      image: erlang:${{ matrix.otp-version }}
+      options: --user 1001
+
+    env:
+      SHELL: /bin/sh            # needed for erlexec
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Compile
+      run: rebar3 compile
+
+    - name: eunit tests
+      run: rebar3 eunit -c
+
+    - name: proper tests
+      run: rebar3 proper -c
+
+    - name: coverage
+      run: rebar3 cover -v --min_coverage 90
+
+    - name: edocs
+      run: rebar3 edoc
+
+    - name: Dialyzer
+      run: rebar3 dialyzer
