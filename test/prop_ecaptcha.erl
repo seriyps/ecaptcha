@@ -211,7 +211,7 @@ prop_gif_lzw_vs_py() ->
         {Len, NColors},
         ?LET(
             Len0,
-            proper_types:range(2, 2000),
+            proper_types:range(3, 2000),
             begin
                 MaxColors = min(Len0, 256),
                 {Len0, proper_types:range(3, MaxColors)}
