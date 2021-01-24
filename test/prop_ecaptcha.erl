@@ -23,7 +23,7 @@
     font_not_found,
     chars_not_binary,
     wrong_chars_length,
-    invalid_character,
+    character_out_of_alphabet_range,
     bad_random,
     small_rand_binary,
     opts_not_list,
@@ -68,7 +68,7 @@ nif_input_gen() ->
         {font_gen(), proper_types:any(), proper_types:binary(), effects_gen(), [
             chars_not_binary,
             wrong_chars_length,
-            invalid_character
+            character_out_of_alphabet_range
         ]},
     BadFont =
         {proper_types:any(), alpha_gen(1, 7), proper_types:binary(ecaptcha_nif:rand_size()),
