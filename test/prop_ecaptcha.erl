@@ -22,7 +22,6 @@
     font_name_not_binary,
     font_not_found,
     chars_not_binary,
-    chars_not_binary,
     wrong_chars_length,
     invalid_character,
     bad_random,
@@ -39,11 +38,11 @@ prop_nif_no_crashes(doc) ->
 
 prop_nif_no_crashes() ->
     ?FORALL(
-        {Font, Chars, Rand, Effects},
+        {Font, Chars, Rand, Effects, ExpectedErrors},
         nif_input_gen(),
         case ecaptcha_nif:pixels(Font, Chars, Rand, Effects) of
             {error, Err} ->
-                lists:member(Err, ?ERR_REASONS);
+                lists:member(Err, ExpectedErrors);
             Bytes when is_binary(Bytes) ->
                 true
         end
@@ -51,16 +50,35 @@ prop_nif_no_crashes() ->
 
 nif_input_gen() ->
     Valid =
-        {font_gen(), alpha_gen(1, 7), proper_types:binary(ecaptcha_nif:rand_size()), effects_gen()},
-    BadRand = {font_gen(), alpha_gen(1, 7), proper_types:binary(), effects_gen()},
+        {font_gen(), alpha_gen(1, 7), proper_types:binary(ecaptcha_nif:rand_size()), effects_gen(),
+            []},
+    BadRand =
+        {font_gen(), alpha_gen(1, 7), proper_types:binary(), effects_gen(), [
+            bad_random,
+            small_rand_binary
+        ]},
     BadOpts =
         {font_gen(), alpha_gen(1, 7), proper_types:binary(ecaptcha_nif:rand_size()),
-            proper_types:any()},
-    BadChars = {font_gen(), proper_types:any(), proper_types:binary(), effects_gen()},
+            proper_types:any(), [
+                opts_not_list,
+                non_atom_option,
+                unknown_option
+            ]},
+    BadChars =
+        {font_gen(), proper_types:any(), proper_types:binary(), effects_gen(), [
+            chars_not_binary,
+            wrong_chars_length,
+            invalid_character
+        ]},
     BadFont =
         {proper_types:any(), alpha_gen(1, 7), proper_types:binary(ecaptcha_nif:rand_size()),
-            effects_gen()},
-    Mess = {proper_types:any(), proper_types:any(), proper_types:any(), proper_types:any()},
+            effects_gen(), [
+                font_name_not_binary,
+                font_not_found
+            ]},
+    Mess =
+        {proper_types:any(), proper_types:any(), proper_types:any(), proper_types:any(),
+            ?ERR_REASONS},
     proper_types:oneof([Valid, BadRand, BadOpts, BadChars, BadFont, Mess]).
 
 %% Pixels
