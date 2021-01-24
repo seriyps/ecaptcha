@@ -35,7 +35,7 @@ jobs:
       run: rebar3 eunit -c
 
     - name: proper tests
-      run: rebar3 proper -c
+      run: rebar3 proper --numtests 80 -c  # it's much slower in CI, so, decreasing the count
 
     - name: coverage
       run: rebar3 cover -v --min_coverage 90
