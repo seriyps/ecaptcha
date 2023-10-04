@@ -19,15 +19,18 @@ C_SRC_OUTPUT ?= $(CURDIR)/../priv/$(PROJECT).so
 UNAME_SYS := $(shell uname -s)
 ifeq ($(UNAME_SYS), Darwin)
 	CC ?= cc
+	NATIVE_CC = cc
 	CFLAGS ?= -O3 -std=c99 -arch x86_64 -finline-functions -Wall -Wmissing-prototypes
 	CXXFLAGS ?= -O3 -arch x86_64 -finline-functions -Wall
 	LDFLAGS ?= -arch x86_64 -flat_namespace -undefined suppress
 else ifeq ($(UNAME_SYS), FreeBSD)
 	CC ?= cc
+	NATIVE_CC = cc
 	CFLAGS ?= -O3 -std=c99 -finline-functions -Wall -Wmissing-prototypes
 	CXXFLAGS ?= -O3 -finline-functions -Wall
 else ifeq ($(UNAME_SYS), Linux)
 	CC ?= gcc
+	NATIVE_CC = gcc
 	CFLAGS ?= -O3 -std=c99 -finline-functions -Wall -Wmissing-prototypes
 #	CFLAGS ?= -g -std=c99 -finline-functions -Wall -Wmissing-prototypes
 	CXXFLAGS ?= -O3 -finline-functions -Wall
@@ -66,7 +69,7 @@ $(C_SRC_OUTPUT): fonts.h $(OBJECTS)
 	$(COMPILE_C) $(OUTPUT_OPTION) $<
 
 mk_font: mk_font.c
-	$(c_verbose) $(CC) $< $(FREETYPE_CFLAGS) -lm $(OUTPUT_OPTION)
+	$(c_verbose) $(NATIVE_CC) $< $(FREETYPE_CFLAGS) -lm $(OUTPUT_OPTION)
 
 format:
 	clang-format --style=LLVM -i $(C_FILES)
